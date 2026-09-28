@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+## 0.1.3 - 2026-09-28
+
+- fix: `scripts/smoke-boot.mjs` still hardcoded the pre-rename plugin id
+  `dsh-jev-dispatch` in the scratch profile's patch entry and in the
+  post-removal assertion, so the id never matched the mounted row and the
+  boot smoke failed with "the profile config override did not reach the
+  plugin row" — CI was red on main since the 0.1.2 rename. Plugin code is
+  unchanged; this only repairs the gate. Also corrected the stale
+  `@aiwayds/dsh-jev-dispatch` name in `package-lock.json`.
+
 ## 0.1.2 - 2026-09-28
 
 First release as `@aiwayds/dsh-agent-dispatch` (renamed from

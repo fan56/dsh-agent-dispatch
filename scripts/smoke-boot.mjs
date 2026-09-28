@@ -19,7 +19,7 @@
 // Exit 0 = mounted, configured, boots clean, and removal restores the stock
 // tree. Temp dir is kept and printed on failure, removed on success.
 //
-// dsh-jev-dispatch note: the shipped plugin is `mode: off`, so the scratch
+// dsh-agent-dispatch note: the shipped plugin is `mode: off`, so the scratch
 // profile flips it to `once` — with no jev key in the runner environment
 // `apply()` then takes its silent leg, which is the jev-optional contract
 // proved on the real host. The smoke proves the plugin LOADS and APPLIES
@@ -36,9 +36,9 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const pkg = JSON.parse(await readFile(path.join(repoRoot, 'package.json'), 'utf8'))
-const ownName = pkg.name // @aiwayds/dsh-jev-dispatch
+const ownName = pkg.name // @aiwayds/dsh-agent-dispatch
 
-const work = mkdtempSync(path.join(tmpdir(), 'dsh-jev-dispatch-smoke-'))
+const work = mkdtempSync(path.join(tmpdir(), 'dsh-agent-dispatch-smoke-'))
 const home = path.join(work, 'dsh-home')
 const profile = path.join(home, 'profiles', 'smoke')
 mkdirSync(profile, { recursive: true })
@@ -62,7 +62,7 @@ writeFileSync(path.join(profile, 'cordis.yml'), '# dsh profile root — empty; t
 // behavior the jev-optional contract requires, proved on the real host.
 writeFileSync(path.join(profile, 'cordis.patch.yml'), [
   '# scratch smoke profile: override the bundle patch to exercise the config path',
-  `- id: dsh-jev-dispatch`,
+  `- id: dsh-agent-dispatch`,
   '  config:',
   '    mode: once',
   '',
@@ -135,7 +135,7 @@ const remove = spawnSync('dsh', ['plugin', '--profile', 'smoke', 'remove', ownNa
 if (remove.status !== 0 || remove.error) fail('dsh plugin remove failed', `${remove.stdout}\n${remove.stderr}`)
 const dumpAfter = spawnSync('dsh', ['--profile', 'smoke', '--dump-config'], { cwd: profile, encoding: 'utf8', env: dshEnv })
 if (dumpAfter.status !== 0 || dumpAfter.error) fail('dsh --dump-config failed after removal', `${dumpAfter.stdout}\n${dumpAfter.stderr}`)
-if (dumpAfter.stdout.includes('dsh-jev-dispatch')) {
+if (dumpAfter.stdout.includes('dsh-agent-dispatch')) {
   fail('the composed tree still contains the plugin entry after removal', dumpAfter.stdout)
 }
 
