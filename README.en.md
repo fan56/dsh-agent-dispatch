@@ -24,14 +24,21 @@ npm install @aiwayds/dsh-jev-dispatch
 
 Peer dependency `@deepseek-ai/dsh >= 0.1.7-rc.1`; requires `@aiwayds/dsh-jev-core` (installed automatically). ESM, Node ≥ 22.
 
-Add it to a profile (`dsh plugin add @aiwayds/dsh-jev-dispatch`) or by hand in `cordis.patch.yml`:
+Add it to a profile (`dsh plugin add @aiwayds/dsh-jev-dispatch`), **then add the package name to the profile's bundle list** — a step `plugin add` does NOT do for you (field-tested 2026-09-28: `plugin --profile list` shows the package as installed, but the host loader only mounts packages listed in `dsh.profile.bundles`; without the manual entry the plugin stays silently inert). Edit `<profile>/package.json`:
+
+```json
+{
+  "dsh": { "profile": { "bundles": [ "...", "@aiwayds/dsh-jev-dispatch" ] } }
+}
+```
+
+Then configure it in `cordis.patch.yml` (id-targeted override; see the package's own patch for the `id: dsh-jev-dispatch` entry):
 
 ```yaml
-- insert:
-    - id: dsh-jev-dispatch
-      name: '@aiwayds/dsh-jev-dispatch'
-      config:
-        mode: once
+- id: dsh-jev-dispatch
+  name: '@aiwayds/dsh-jev-dispatch'
+  config:
+    mode: once
 ```
 
 ## Configuring the jev key (keychain-first, zero plaintext)
