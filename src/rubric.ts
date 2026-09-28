@@ -1,5 +1,5 @@
 /**
- * `@aiwayds/dsh-jev-dispatch` — the rubric and the turn triggers.
+ * `@aiwayds/dsh-agent-dispatch` — the rubric and the turn triggers.
  *
  * Four atomic questions in ONE request (the wire contract bills and waits once):
  *

@@ -27,7 +27,7 @@ jobs:
     name: Gate & Publish
     # Only the upstream repo publishes; forks skip this job (and the release
     # job below is skipped with it via needs).
-    if: github.repository == 'fan56/dsh-jev-dispatch'
+    if: github.repository == 'fan56/dsh-agent-dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -54,7 +54,7 @@ jobs:
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           npm version "${TAG_VERSION}" --no-git-tag-version --allow-same-version
-          echo "publishing @aiwayds/dsh-jev-dispatch@${TAG_VERSION} (tag ${GITHUB_REF_NAME})"
+          echo "publishing @aiwayds/dsh-agent-dispatch@${TAG_VERSION} (tag ${GITHUB_REF_NAME})"
 
       - name: Publish to npm
         # Idempotent; prerelease tags publish on a side dist-tag so a test
@@ -69,8 +69,8 @@ jobs:
             *) NPM_TAG="latest" ;;
           esac
           echo "npm dist-tag: ${NPM_TAG}"
-          if npm view "@aiwayds/dsh-jev-dispatch@${TAG_VERSION}" version >/dev/null 2>&1; then
-            echo "::warning::@aiwayds/dsh-jev-dispatch@${TAG_VERSION} is already on npm — skipping publish"
+          if npm view "@aiwayds/dsh-agent-dispatch@${TAG_VERSION}" version >/dev/null 2>&1; then
+            echo "::warning::@aiwayds/dsh-agent-dispatch@${TAG_VERSION} is already on npm — skipping publish"
             exit 0
           fi
           set +e
@@ -93,14 +93,14 @@ jobs:
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           for attempt in $(seq 1 30); do
-            if npm view "@aiwayds/dsh-jev-dispatch@${TAG_VERSION}" version >/dev/null 2>&1; then
-              echo "verified: @aiwayds/dsh-jev-dispatch@${TAG_VERSION} is visible on the registry (attempt ${attempt})"
+            if npm view "@aiwayds/dsh-agent-dispatch@${TAG_VERSION}" version >/dev/null 2>&1; then
+              echo "verified: @aiwayds/dsh-agent-dispatch@${TAG_VERSION} is visible on the registry (attempt ${attempt})"
               exit 0
             fi
             echo "attempt ${attempt}/30: not visible yet; waiting 10s"
             sleep 10
           done
-          echo "::error::publish reported success but npm view never saw @aiwayds/dsh-jev-dispatch@${TAG_VERSION} after ~5 min — inspect the registry manually before trusting this release"
+          echo "::error::publish reported success but npm view never saw @aiwayds/dsh-agent-dispatch@${TAG_VERSION} after ~5 min — inspect the registry manually before trusting this release"
           exit 1
 
   release:

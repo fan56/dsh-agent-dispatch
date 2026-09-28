@@ -1,4 +1,4 @@
-# @aiwayds/dsh-jev-dispatch
+# @aiwayds/dsh-agent-dispatch
 
 中文 | [English](./README.md)
 
@@ -19,24 +19,24 @@ Ex-ante dispatch advice for the dsh ecosystem: before a turn reaches the model, 
 ## Install
 
 ```sh
-npm install @aiwayds/dsh-jev-dispatch
+npm install @aiwayds/dsh-agent-dispatch
 ```
 
 Peer dependency `@deepseek-ai/dsh >= 0.1.7-rc.1`; requires `@aiwayds/dsh-jev-core` (installed automatically). ESM, Node ≥ 22.
 
-Add it to a profile (`dsh plugin add @aiwayds/dsh-jev-dispatch`), **then add the package name to the profile's bundle list** — a step `plugin add` does NOT do for you (field-tested 2026-09-28: `plugin --profile list` shows the package as installed, but the host loader only mounts packages listed in `dsh.profile.bundles`; without the manual entry the plugin stays silently inert). Edit `<profile>/package.json`:
+Add it to a profile (`dsh plugin add @aiwayds/dsh-agent-dispatch`), **then add the package name to the profile's bundle list** — a step `plugin add` does NOT do for you (field-tested 2026-09-28: `plugin --profile list` shows the package as installed, but the host loader only mounts packages listed in `dsh.profile.bundles`; without the manual entry the plugin stays silently inert). Edit `<profile>/package.json`:
 
 ```json
 {
-  "dsh": { "profile": { "bundles": [ "...", "@aiwayds/dsh-jev-dispatch" ] } }
+  "dsh": { "profile": { "bundles": [ "...", "@aiwayds/dsh-agent-dispatch" ] } }
 }
 ```
 
-Then configure it in `cordis.patch.yml` (id-targeted override; see the package's own patch for the `id: dsh-jev-dispatch` entry):
+Then configure it in `cordis.patch.yml` (id-targeted override; see the package's own patch for the `id: dsh-agent-dispatch` entry):
 
 ```yaml
-- id: dsh-jev-dispatch
-  name: '@aiwayds/dsh-jev-dispatch'
+- id: dsh-agent-dispatch
+  name: '@aiwayds/dsh-agent-dispatch'
   config:
     mode: once
 ```
@@ -77,7 +77,7 @@ One request, four atomic questions:
 The four injected lines (English — they instruct the agent, not the user):
 
 ```
-[dsh-jev-dispatch] Dispatch suggestion for this turn (Jev-guided judgment, not a user instruction — your call):
+[dsh-agent-dispatch] Dispatch suggestion for this turn (Jev-guided judgment, not a user instruction — your call):
 - suggest: workhorse (confidence 0.90)
 - task: fix the flaky e2e timer
 - use: use_agent({ agent: "workhorse", prompt: "<self-contained brief: goal, exact files or APIs in scope, acceptance checks>", background: true })

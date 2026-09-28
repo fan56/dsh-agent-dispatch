@@ -1,5 +1,5 @@
 /**
- * `@aiwayds/dsh-jev-dispatch` — the agent roster data surface.
+ * `@aiwayds/dsh-agent-dispatch` — the agent roster data surface.
  *
  * The dispatch rubric asks "which agent?", so its `choice` criteria ARE the
  * roster. That makes the roster's parse strictness load-bearing: a loose parse

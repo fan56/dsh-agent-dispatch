@@ -11,7 +11,7 @@ import { join } from 'node:path'
 
 /** A temp agents directory; removed by the returned cleanup. */
 export function tempRosterDir(files) {
-  const dir = mkdtempSync(join(tmpdir(), 'dsh-jev-dispatch-roster-'))
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-agent-dispatch-roster-'))
   for (const [name, content] of Object.entries(files)) {
     writeFileSync(join(dir, name), content, 'utf8')
   }
@@ -22,7 +22,7 @@ export function tempRosterDir(files) {
 }
 
 /** A temp directory tree for the verdict log. */
-export function tempDir(prefix = 'dsh-jev-dispatch-') {
+export function tempDir(prefix = 'dsh-agent-dispatch-') {
   const dir = mkdtempSync(join(tmpdir(), prefix))
   return {
     dir,
@@ -111,7 +111,7 @@ export function userMessage(text, id = 'm1') {
 
 /** A message this plugin (or any other producer) injected — never user-authored. */
 export function pluginInjected(text, id = 'p1') {
-  return { id, role: 'user', content: [{ type: 'text', text }], source: { kind: 'plugin:dsh-jev-dispatch' } }
+  return { id, role: 'user', content: [{ type: 'text', text }], source: { kind: 'plugin:dsh-agent-dispatch' } }
 }
 
 /** A message builder that records what the plugin tried to inject. */
@@ -197,7 +197,7 @@ export async function readVerdicts(file) {
 
 /** A directory containing no agents at all. */
 export function emptyRosterDir() {
-  const dir = mkdtempSync(join(tmpdir(), 'dsh-jev-dispatch-empty-'))
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-agent-dispatch-empty-'))
   return {
     dir,
     agentsDir: join(dir, 'agents'),

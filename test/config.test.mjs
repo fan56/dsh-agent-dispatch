@@ -90,6 +90,6 @@ test('validate returns the same object it checked', () => {
 })
 
 test('the plugin stamps its own message source kind', () => {
-  assert.equal(PLUGIN_NAME, 'dsh-jev-dispatch')
-  assert.equal(PLUGIN_SOURCE_KIND, 'plugin:dsh-jev-dispatch')
+  assert.equal(PLUGIN_NAME, 'dsh-agent-dispatch')
+  assert.equal(PLUGIN_SOURCE_KIND, 'plugin:dsh-agent-dispatch')
 })

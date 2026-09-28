@@ -1,5 +1,5 @@
 /**
- * `@aiwayds/dsh-jev-dispatch` — the runtime capability gate.
+ * `@aiwayds/dsh-agent-dispatch` — the runtime capability gate.
  *
  * A dispatch suggestion is only worth a jev call when the agent can actually
  * dispatch. Four things must hold, and NONE of them is implied by this plugin

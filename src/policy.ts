@@ -1,5 +1,5 @@
 /**
- * `@aiwayds/dsh-jev-dispatch` — the policy.
+ * `@aiwayds/dsh-agent-dispatch` — the policy.
  *
  * A pure function over one strictly-validated answer set: what the plugin
  * should do with this turn. No host, no network, no key — which is what makes

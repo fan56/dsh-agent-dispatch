@@ -19,7 +19,7 @@ const ADVISE = {
 test('the advice is four compact lines: agent + in-band confidence, task, use_agent call, dismiss line', () => {
   const lines = renderAdvice(ADVISE, OPTIONS).split('\n')
   assert.equal(lines.length, 5) // banner + four
-  assert.match(lines[0], /^\[dsh-jev-dispatch\] Dispatch suggestion/)
+  assert.match(lines[0], /^\[dsh-agent-dispatch\] Dispatch suggestion/)
   assert.match(lines[1], /^- suggest: workhorse \(confidence 0\.90\)$/)
   assert.equal(lines[2], '- task: fix the flaky e2e timer')
   assert.match(lines[3], /^- use: use_agent\(\{ agent: "workhorse", prompt: .*background: true \}\)$/)
@@ -94,6 +94,6 @@ test('every injected message is attributed to this plugin', () => {
     renderUnavailable(['x']),
   ]
   for (const message of messages) {
-    assert.ok(message.startsWith('[dsh-jev-dispatch] '))
+    assert.ok(message.startsWith('[dsh-agent-dispatch] '))
   }
 })

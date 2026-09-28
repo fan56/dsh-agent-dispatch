@@ -1,4 +1,4 @@
-# @aiwayds/dsh-jev-dispatch
+# @aiwayds/dsh-agent-dispatch
 
 [English](./README.en.md) | 中文
 
@@ -19,24 +19,24 @@ dsh 生态的**事前派发建议**插件（ex-ante dispatch）：在一个 turn
 ## 安装
 
 ```sh
-npm install @aiwayds/dsh-jev-dispatch
+npm install @aiwayds/dsh-agent-dispatch
 ```
 
 peer 依赖 `@deepseek-ai/dsh >= 0.1.7-rc.1`，需要 `@aiwayds/dsh-jev-core`（自动装）。ESM，Node ≥ 22。
 
-装到 profile（`dsh plugin add @aiwayds/dsh-jev-dispatch`），**然后把包名加进 profile 的 bundle 列表**——这是 `plugin add` 不会替你做的一步（实测 2026-09-28：`plugin --profile tui list` 会显示已安装，但宿主 loader 只挂载 `dsh.profile.bundles` 里列出的包，漏了这一步插件永远静默不生效）。编辑 `<profile>/package.json`：
+装到 profile（`dsh plugin add @aiwayds/dsh-agent-dispatch`），**然后把包名加进 profile 的 bundle 列表**——这是 `plugin add` 不会替你做的一步（实测 2026-09-28：`plugin --profile tui list` 会显示已安装，但宿主 loader 只挂载 `dsh.profile.bundles` 里列出的包，漏了这一步插件永远静默不生效）。编辑 `<profile>/package.json`：
 
 ```json
 {
-  "dsh": { "profile": { "bundles": [ "...", "@aiwayds/dsh-jev-dispatch" ] } }
+  "dsh": { "profile": { "bundles": [ "...", "@aiwayds/dsh-agent-dispatch" ] } }
 }
 ```
 
-再在 `cordis.patch.yml` 里配置（id-targeted override，见包内默认 patch 的 `id: dsh-jev-dispatch`）：
+再在 `cordis.patch.yml` 里配置（id-targeted override，见包内默认 patch 的 `id: dsh-agent-dispatch`）：
 
 ```yaml
-- id: dsh-jev-dispatch
-  name: '@aiwayds/dsh-jev-dispatch'
+- id: dsh-agent-dispatch
+  name: '@aiwayds/dsh-agent-dispatch'
   config:
     mode: once
 ```
@@ -77,7 +77,7 @@ security add-generic-password -s typesafe.ai -a "$USER" -w
 注入的四行（英文，因为它是给 agent 的指令，不是给用户的）：
 
 ```
-[dsh-jev-dispatch] Dispatch suggestion for this turn (Jev-guided judgment, not a user instruction — your call):
+[dsh-agent-dispatch] Dispatch suggestion for this turn (Jev-guided judgment, not a user instruction — your call):
 - suggest: workhorse (confidence 0.90)
 - task: 修一下 e2e 里 flaky 的计时器
 - use: use_agent({ agent: "workhorse", prompt: "<self-contained brief: goal, exact files or APIs in scope, acceptance checks>", background: true })

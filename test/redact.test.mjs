@@ -42,7 +42,7 @@ test('messageText reads text parts and ignores everything else', () => {
 
 test('plugin-authored messages are not user turns', () => {
   assert.equal(isPlainUserMessage(userMessage('hi')), true)
-  assert.equal(isPlainUserMessage(pluginInjected('[dsh-jev-dispatch] advice')), false)
+  assert.equal(isPlainUserMessage(pluginInjected('[dsh-agent-dispatch] advice')), false)
   assert.equal(isPlainUserMessage({ role: 'assistant', content: 'hi' }), false)
 })
 

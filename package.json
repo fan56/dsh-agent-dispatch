@@ -1,5 +1,5 @@
 {
-  "name": "@aiwayds/dsh-jev-dispatch",
+  "name": "@aiwayds/dsh-agent-dispatch",
   "version": "0.1.0",
   "description": "dsh plugin: Jev-guided dispatch advice — before a turn starts, a TypeSafe Jev call decides whether the task belongs to a registered agent and which one, then injects a four-line, ignore-if-unsuited recommendation. Jev-optional: no key means silence.",
   "keywords": [
@@ -55,9 +55,9 @@
   "author": "fan56",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fan56/dsh-jev-dispatch.git"
+    "url": "git+https://github.com/fan56/dsh-agent-dispatch.git"
   },
-  "homepage": "https://github.com/fan56/dsh-jev-dispatch",
+  "homepage": "https://github.com/fan56/dsh-agent-dispatch",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

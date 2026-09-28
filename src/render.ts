@@ -1,5 +1,5 @@
 /**
- * `@aiwayds/dsh-jev-dispatch` — the injected messages.
+ * `@aiwayds/dsh-agent-dispatch` — the injected messages.
  *
  * English on purpose: these messages instruct the AGENT (whose instructions
  * are English), not the user. They are appended after every downstream

@@ -1,5 +1,5 @@
 /**
- * `@aiwayds/dsh-jev-dispatch` — the verdict log.
+ * `@aiwayds/dsh-agent-dispatch` — the verdict log.
  *
  * Opt-in (a configured `logDir` turns it on, nothing else does) and append-only
  * NDJSON: one JSON object per line, so a calibration run is a `jq` pipeline and

@@ -124,7 +124,7 @@ test('an aborted turn is returned untouched', async () => {
 
 test('an ordinary turn is silent: no call, no message, no log', async () => {
   const jev = fakeJev({ dispatch: 0.9 })
-  const log = tempDir('dsh-jev-dispatch-plugin-')
+  const log = tempDir('dsh-agent-dispatch-plugin-')
   const { ctx, cleanup } = mount({ config: { logDir: log.dir }, deps: { fetch: jev.fetchImpl } })
   try {
     const decision = ENTER([userMessage('just a normal question')])
@@ -176,7 +176,7 @@ test('an explicit dispatch request advises and appends after every existing mess
 
 test('the advice names the agent id use_agent takes, not the rubric label', async () => {
   const jev = fakeJev({ dispatch: 0.85, agent: WORKHORSE })
-  const log = tempDir('dsh-jev-dispatch-plugin-')
+  const log = tempDir('dsh-agent-dispatch-plugin-')
   const { ctx, cleanup } = mount({ config: { logDir: log.dir }, deps: { fetch: jev.fetchImpl } })
   try {
     await ctx.step({ agent: fakeAgent(), decision: ENTER([userMessage('/dispatch fix it')]) })
@@ -297,7 +297,7 @@ test('an empty roster blocks the call and says so', async () => {
 })
 
 test('an unavailable gate writes a verdict row so the gap is measurable', async () => {
-  const log = tempDir('dsh-jev-dispatch-plugin-')
+  const log = tempDir('dsh-agent-dispatch-plugin-')
   const { ctx, cleanup } = mount({
     config: { logDir: log.dir },
     deps: { services: workingServices({ providerRegistered: false }) },
@@ -317,7 +317,7 @@ test('an unavailable gate writes a verdict row so the gap is measurable', async 
 
 test('fail-open: a jev failure passes the turn through and stays quiet', async () => {
   const jev = failingJev(503, 'upstream down')
-  const log = tempDir('dsh-jev-dispatch-plugin-')
+  const log = tempDir('dsh-agent-dispatch-plugin-')
   const { ctx, cleanup } = mount({ config: { logDir: log.dir }, deps: { fetch: jev.fetchImpl } })
   try {
     const decision = ENTER([userMessage('/dispatch fix it')])
@@ -336,7 +336,7 @@ test('fail-open: a jev failure passes the turn through and stays quiet', async (
 })
 
 test('fail-open: a strictly-invalid response is a typed error, also fail-open', async () => {
-  const log = tempDir('dsh-jev-dispatch-plugin-')
+  const log = tempDir('dsh-agent-dispatch-plugin-')
   const { ctx, cleanup } = mount({
     config: { logDir: log.dir },
     deps: {
@@ -359,7 +359,7 @@ test('fail-open: a strictly-invalid response is a typed error, also fail-open', 
 })
 
 test('a verdict log row records the pick, the confidence, the answers and the delivery', async () => {
-  const log = tempDir('dsh-jev-dispatch-plugin-')
+  const log = tempDir('dsh-agent-dispatch-plugin-')
   const jev = fakeJev({ dispatch: 0.85, agent: WORKHORSE, long_running: 0.9 })
   const { ctx, cleanup } = mount({ config: { logDir: log.dir }, deps: { fetch: jev.fetchImpl } })
   try {
@@ -456,7 +456,7 @@ test('the plugin never re-classifies its own past advice', async () => {
   const jev = fakeJev({ dispatch: 0.85, agent: WORKHORSE })
   const { ctx, cleanup } = mount({ deps: { fetch: jev.fetchImpl } })
   try {
-    const decision = ENTER([pluginInjected('[dsh-jev-dispatch] suggest: workhorse'), userMessage('/dispatch real request')])
+    const decision = ENTER([pluginInjected('[dsh-agent-dispatch] suggest: workhorse'), userMessage('/dispatch real request')])
     await ctx.step({ agent: fakeAgent(), decision })
     const { state } = jev.calls[0].body
     assert.ok(!state.includes('suggest: workhorse'))

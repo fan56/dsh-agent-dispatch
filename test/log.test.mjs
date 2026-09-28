@@ -20,7 +20,7 @@ const RECORD = {
 }
 
 test('one NDJSON row per verdict, appended in order', async () => {
-  const dir = tempDir('dsh-jev-dispatch-log-')
+  const dir = tempDir('dsh-agent-dispatch-log-')
   try {
     await appendVerdict(dir.dir, { ...RECORD, reason: 'first' })
     await appendVerdict(dir.dir, { ...RECORD, reason: 'second' })
@@ -36,7 +36,7 @@ test('one NDJSON row per verdict, appended in order', async () => {
 })
 
 test('the log directory is created on demand', async () => {
-  const dir = tempDir('dsh-jev-dispatch-log-')
+  const dir = tempDir('dsh-agent-dispatch-log-')
   try {
     await appendVerdict(`${dir.dir}/nested/deeper`, RECORD)
     assert.equal((await readVerdicts(dir.file('nested/deeper/verdicts.ndjson'))).length, 1)
@@ -46,7 +46,7 @@ test('the log directory is created on demand', async () => {
 })
 
 test('a log failure is a warn, never a throw — observability cannot break a turn', async () => {
-  const dir = tempDir('dsh-jev-dispatch-log-')
+  const dir = tempDir('dsh-agent-dispatch-log-')
   try {
     // a regular file where a directory is expected: mkdir fails, append never runs
     await appendFile(dir.file('blocked'), 'not a directory', 'utf8')
@@ -60,7 +60,7 @@ test('a log failure is a warn, never a throw — observability cannot break a tu
 })
 
 test('a failing log with no logger attached still does not throw', async () => {
-  const dir = tempDir('dsh-jev-dispatch-log-')
+  const dir = tempDir('dsh-agent-dispatch-log-')
   try {
     await appendFile(dir.file('blocked'), 'not a directory', 'utf8')
     await appendVerdict(dir.file('blocked'), RECORD)

@@ -1,5 +1,5 @@
 /**
- * `@aiwayds/dsh-jev-dispatch` — the plugin host half.
+ * `@aiwayds/dsh-agent-dispatch` — the plugin host half.
  *
  * Joins the `agent/pre-step` waterfall with `prepend: true`, awaits the
  * downstream decision, and — for turns that explicitly asked for a verdict
@@ -111,7 +111,7 @@ function aborted(signal: AbortSignal | undefined): boolean {
 /**
  * Cordis plugin entry.
  * @param ctx - the host context.
- * @param input - the `dsh-jev-dispatch` row's `config`.
+ * @param input - the `dsh-agent-dispatch` row's `config`.
  * @param deps - dependency overrides for tests.
  */
 export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}): void {

@@ -1,5 +1,5 @@
 /**
- * `@aiwayds/dsh-jev-dispatch` — configuration resolution.
+ * `@aiwayds/dsh-agent-dispatch` — configuration resolution.
  *
  * One configuration source: the plugin row's `config` in the dsh bundle patch
  * (the shipped patch is empty; a profile patch overrides the same row by id,
@@ -17,7 +17,7 @@
  * @module
  */
 
-export const PLUGIN_NAME = 'dsh-jev-dispatch'
+export const PLUGIN_NAME = 'dsh-agent-dispatch'
 /** The `MessageSource.kind` this plugin stamps on its injected messages. */
 export const PLUGIN_SOURCE_KIND = `plugin:${PLUGIN_NAME}`
 

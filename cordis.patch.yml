@@ -1,5 +1,5 @@
-# dsh-jev-dispatch bundle patch: mounts the ex-ante dispatch plugin under the
-# stable id `dsh-jev-dispatch`. It joins the `agent/pre-step` waterfall
+# dsh-agent-dispatch bundle patch: mounts the ex-ante dispatch plugin under the
+# stable id `dsh-agent-dispatch`. It joins the `agent/pre-step` waterfall
 # (prepend, so its message is appended after every downstream listener's) and,
 # for turns that explicitly ask for a verdict, asks TypeSafe's Jev whether the
 # task belongs to a registered agent and which one — then injects a four-line
@@ -12,6 +12,6 @@
 # (keychain-first, see README) or the plugin stays silent.
 
 - insert:
-    - id: dsh-jev-dispatch
-      name: '@aiwayds/dsh-jev-dispatch'
+    - id: dsh-agent-dispatch
+      name: '@aiwayds/dsh-agent-dispatch'
       config: {}

@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+## 0.1.1 (as @aiwayds/dsh-agent-dispatch) - 2026-09-28
+
+Renamed from `@aiwayds/dsh-jev-dispatch` (same code as that package's
+0.1.1): the old name said HOW (jev), the new name says WHAT (agent
+dispatch advice) and matches the ecosystem's functional naming
+(dsh-ask-router, dsh-subagent-registry, dsh-approval-policy, ...).
+
 ## 0.1.1 - 2026-09-28
 
 - `timeoutMs` default 2000 → 5000: real-machine verdicts measured cold-start

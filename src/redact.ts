@@ -1,5 +1,5 @@
 /**
- * `@aiwayds/dsh-jev-dispatch` — the outbound state and its redaction.
+ * `@aiwayds/dsh-agent-dispatch` — the outbound state and its redaction.
  *
  * Everything this plugin sends to TypeSafe is assembled here, so this is the
  * only module that has to be right about what leaves the machine. Two rules:
@@ -72,7 +72,7 @@ export function messageText(message: DispatchMessage | null | undefined): string
 /**
  * Whether a message is a real user turn rather than a plugin or synthetic
  * injection. Plugin producers stamp their own `source.kind`
- * (`plugin:dsh-jev-dispatch`, legacy `plugin`, …), so anything carrying a
+ * (`plugin:dsh-agent-dispatch`, legacy `plugin`, …), so anything carrying a
  * non-user kind is excluded from the state.
  */
 export function isPlainUserMessage(message: DispatchMessage | null | undefined): boolean {
