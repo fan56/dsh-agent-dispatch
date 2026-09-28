@@ -210,15 +210,16 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
         // An auto turn arrived here through the local gate and never asked for
         // a verdict, so a gap in the subagent stack is not its business: it
         // injects nothing, writes no log row, and gets no diagnostic. But a gap
-        // that lasts the whole session is also exactly the "looks on, can never
+        // that lasts the whole process is also exactly the "looks on, can never
         // fire" mismatch this plugin refuses to ship silently — so the FIRST
         // such turn says once, in one line, what is missing and that these
-        // turns stay quiet on purpose. Later hits do not repeat it: the hook is
-        // per mount, and a per-turn line would be the noise the design avoids.
+        // turns stay quiet on purpose. Later hits do not repeat it: the flag is
+        // per plugin instance (it is reset by a remount, not by a new session),
+        // and a per-turn line would be the noise the design avoids.
         if (trigger === null) {
           if (!warnedAutoGap) {
             warnedAutoGap = true
-            logger.info?.(`${PLUGIN_NAME}: mode auto cannot dispatch in this session — ${capabilities.missing.join('; ')}; keyword-hit turns stay silent by design (this line is logged once)`)
+            logger.info?.(`${PLUGIN_NAME}: mode auto cannot dispatch in this process — ${capabilities.missing.join('; ')}; keyword-hit turns stay silent by design (this line is logged once per plugin instance)`)
           }
           return decision as never
         }
@@ -333,17 +334,22 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
  * CR/LF or a colon; the NDJSON row survives either (`JSON.stringify` escapes
  * it), but a raw newline makes the line unreadable by eye and by `grep`, and an
  * unreadable label is useless as calibration evidence. So: newlines become
- * spaces, whitespace collapses, and the label is capped at 64 characters. A
- * colon is left alone — it cannot break the row, and the label stays as close to
- * the configured keyword as the format allows.
+ * spaces, whitespace collapses, and the label is capped at 64 CHARACTERS — code
+ * points, not UTF-16 units. `slice` counts units, so a keyword carrying an emoji
+ * (`bug🚀🚀…`) could be cut between the halves of a surrogate pair; the lone
+ * surrogate then lands in the NDJSON row and `jq` rejects the whole file
+ * (`Invalid \uXXXX\uXXXX surrogate pair escape`, exit 5) — exactly the
+ * calibration flow the README teaches. A colon is left alone — it cannot break
+ * the row, and the label stays as close to the configured keyword as the format
+ * allows.
  * @param keyword - the dictionary entry that matched, verbatim.
  */
 function keywordLabel(keyword: string): string {
-  return keyword
+  const cleaned = keyword
     .replace(/[\r\n]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 64)
+  return Array.from(cleaned).slice(0, 64).join('')
 }
 
 /**

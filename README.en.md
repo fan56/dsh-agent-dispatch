@@ -77,16 +77,18 @@ The default `autoKeywords` dictionary (replaceable as a whole):
 - Chinese / non-ASCII (**substring** match — Chinese has no word boundaries):
   `帮我` `请帮` `麻烦你` `麻烦帮` `实现` `修复` `排查` `调查` `调研` `研究` `分析` `优化` `重构` `部署` `发布` `测试` `迁移` `升级` `接入` `集成` `审查` `评审` `复现` `定位` `验证` `写一个` `改一下` `加一个` `跑一下` `修改` `检查` `删除` `移除` `去掉` `报错` `生成` `梳理` `提交` `构建` `安装` `总结` `对比` `看一下` `看看` `为什么会`
 - ASCII (**word-bounded**, case-insensitive, one common suffix allowed):
-  `implement` `fix` `refactor` `investigate` `research` `analyze` `analyse` `optimize` `optimise` `deploy` `test` `write` `add` `remove` `replace` `migrate` `upgrade` `review` `debug` `reproduce` `verify` `diagnose` `help me` `write a` `build` `commit` `check` `explain` `summarize` `generate` `delete` `install` `update` `run` `document` `analysis` `writing` `debugging`
+  `implement` `fix` `refactor` `investigate` `research` `analyze` `analyse` `optimize` `optimise` `deploy` `test` `write` `add` `remove` `replace` `migrate` `upgrade` `review` `debug` `reproduce` `verify` `diagnose` `help me` `build` `commit` `check` `explain` `summarize` `generate` `delete` `install` `update` `run` `document` `analysis` `writing` `debugging` `running` `committed` `verified`
 
 Single Chinese characters are deliberately excluded — 写/改/加/删 are everywhere in small talk, and a one-character gate would fire on ordinary conversation. The bias is **asymmetric** and deliberately wide otherwise: a false hit costs one jev call (and mostly comes back `skip`), while a miss costs the turn its whole feature — and the user cannot tell a miss from a broken install, which is why the most common task phrasings (`修改`/`检查`/`生成`, `build`/`commit`/`run`) are in.
 
-Four matching rules, all applied to a **copy used for matching only** — the state sent to jev and every verdict-log line keep the user's bytes:
+Four matching rules, all applied to a **copy used for matching only** — the user's text reaches the state sent to jev as typed, apart from redaction and the `stateChars` cap; the only thing that gets cleaned and truncated is the `kw:` label in the verdict log:
 
-- **One common ASCII suffix is allowed**: `s`/`es`/`ed`/`ing`/`ment`/`ments`, so `fixing`/`fixed`/`tests`/`deployment`/`refactoring` hit, while `prefix` (the `r` after `pre`+`fix`), `address`, and `addressing` still miss. Irregular forms the suffix rule cannot reach (`writing`, `debugging`, `analysis`) are shipped as their own entries.
+- **One common ASCII suffix is allowed**: `s`/`es`/`ed`/`ing`/`ment`/`ments`/`d`, so `fixing`/`fixed`/`tests`/`deployment`/`refactoring` hit, and `d` lets an `-e` stem recognize its own past tense (`removed`/`updated`/`generated`/`deleted`), while `prefix` (the `r` after `pre`+`fix`), `address`, and `addressing` still miss. Irregular forms the suffix rule cannot reach (`writing`, `debugging`, `analysis`, `running`, `committed`, `verified`) are shipped as their own entries.
 - **Hyphens separate words** (a word character is a letter, a digit, or an underscore): `fix-me` and `the e2e-test is red` hit; the identifier `fix_it` does not.
-- **Whitespace folds**: runs of whitespace collapse to one space before matching, so `help  me` and `help\nme` both hit `help me`; inside a multi-word entry (`help me`, `write a`) that whitespace is treated as a separator of the "not a letter, digit, or underscore" class — punctuation counts too — so `help,me` and `help-me` hit as well, while `helpXme` and `help_me` do not.
+- **Whitespace folds**: runs of whitespace collapse to one space before matching, so `help  me` and `help\nme` both hit `help me`; inside a multi-word entry (`help me`) that whitespace is treated as a separator of the "not a letter, digit, or underscore" class — punctuation counts too — so `help,me` and `help-me` hit as well, while `helpXme` and `help_me` do not.
 - **NFKC normalization**: a full-width `ｆｉｘ this bug` (an input method left on Chinese) hits `fix`.
+
+Note that the gate scans the **whole turn text**, while the state sent to jev is capped by `stateChars` (1200 by default) — a keyword that falls outside that window still hits, and still earns the jev call, jev just never sees the word.
 
 One request, four atomic questions:
 
@@ -161,7 +163,7 @@ What leaves the machine: the turn's **plain user text only** (plugin- and tool-a
 | `toolName` | `'use_agent'` | the dispatch tool the gate probes |
 | `provider` | `'spawn'` | the subagent provider the gate probes |
 | `triggers` | `['/dispatch', '/jev']` | trigger words; they outrank the keyword gate in every mode |
-| `autoKeywords` | bilingual task-verb dictionary (see Usage) | the local gate dictionary for `auto`: Chinese matches as a substring, ASCII on word boundaries with one suffix allowed (`s`/`es`/`ed`/`ing`/`ment`/`ments`, so `fix` covers `fixing` but still misses `prefix`), hyphens separate words, and matching runs on an NFKC-folded, whitespace-collapsed copy; case-insensitive; consulted under `auto` only |
+| `autoKeywords` | bilingual task-verb dictionary (see Usage) | the local gate dictionary for `auto`: Chinese matches as a substring, ASCII on word boundaries with one suffix allowed (`s`/`es`/`ed`/`ing`/`ment`/`ments`/`d`, so `fix` covers `fixing` and `remove` covers `removed`, but `fix` still misses `prefix`), hyphens separate words, and the separator between the words of a multi-word entry is any run of characters that are not letters/digits/underscores (so `help,me`/`help-me` hit while `help_me`/`helpXme` do not); matching runs on an NFKC-folded, whitespace-collapsed copy; case-insensitive; consulted under `auto` only |
 | `timeoutMs` | `5000` | the deadline for **one jev call** (ms). A hit turn also pays the roster read, the redaction pass, and the render — so this is the largest part of a turn's added wait, not "the worst-case extra milliseconds one turn can wait"; on timeout it fails open, the turn proceeds, there is just no advice |
 | `stateChars` | `1200` | state cap |
 | `model` | `null` | jev model id; `null` uses the core's pinned version |

@@ -77,16 +77,18 @@ security add-generic-password -s typesafe.ai -a "$USER" -w
 - 中文 / 非 ASCII（**子串**命中，中文没有词边界）：
   `帮我` `请帮` `麻烦你` `麻烦帮` `实现` `修复` `排查` `调查` `调研` `研究` `分析` `优化` `重构` `部署` `发布` `测试` `迁移` `升级` `接入` `集成` `审查` `评审` `复现` `定位` `验证` `写一个` `改一下` `加一个` `跑一下` `修改` `检查` `删除` `移除` `去掉` `报错` `生成` `梳理` `提交` `构建` `安装` `总结` `对比` `看一下` `看看` `为什么会`
 - ASCII（**词边界**命中，不分大小写，允许跟一个常见后缀）：
-  `implement` `fix` `refactor` `investigate` `research` `analyze` `analyse` `optimize` `optimise` `deploy` `test` `write` `add` `remove` `replace` `migrate` `upgrade` `review` `debug` `reproduce` `verify` `diagnose` `help me` `write a` `build` `commit` `check` `explain` `summarize` `generate` `delete` `install` `update` `run` `document` `analysis` `writing` `debugging`
+  `implement` `fix` `refactor` `investigate` `research` `analyze` `analyse` `optimize` `optimise` `deploy` `test` `write` `add` `remove` `replace` `migrate` `upgrade` `review` `debug` `reproduce` `verify` `diagnose` `help me` `build` `commit` `check` `explain` `summarize` `generate` `delete` `install` `update` `run` `document` `analysis` `writing` `debugging` `running` `committed` `verified`
 
 中文刻意不收单字——`写`/`改`/`加`/`删` 在闲聊里到处都是，一个单字闸门会把日常对话全打中。取舍是**不对称**的、并且刻意放宽：误命中的代价是一次 jev 调用（而且多半判 skip），漏判的代价是这个回合整个功能不存在——用户还分不清"没命中"和"装坏了"，所以 `修改`/`检查`/`生成`/`build`/`commit`/`run` 这类最高频的派活表达必须收进来。
 
-匹配的四条规矩（都只作用于**用于匹配的副本**，发给 jev 的 state 与 verdict log 里仍是用户原文逐字节不动）：
+匹配的四条规矩（都只作用于**用于匹配的副本**：用户原文按原样进入发给 jev 的 state，脱敏与 `stateChars` 截断除外——会被清洗和截断的只有 verdict log 里的 `kw:` 标签本身）：
 
-- **ASCII 允许一个常见后缀** `s`/`es`/`ed`/`ing`/`ment`/`ments`：`fixing`/`fixed`/`tests`/`deployment`/`refactoring` 都命中；`prefix`（`pre`+`fix` 后面是 `r`）、`address`、`addressing` 仍然不命中。屈变规则够不到的形态（`writing`、`debugging`、`analysis`）作为词条单独列出。
+- **ASCII 允许一个常见后缀** `s`/`es`/`ed`/`ing`/`ment`/`ments`/`d`：`fixing`/`fixed`/`tests`/`deployment`/`refactoring` 都命中，`d` 让 `-e` 结尾的词干认出自己的过去式（`removed`/`updated`/`generated`/`deleted`）；`prefix`（`pre`+`fix` 后面是 `r`）、`address`、`addressing` 仍然不命中。屈变规则够不到的形态（`writing`、`debugging`、`analysis`、`running`、`committed`、`verified`）作为词条单独列出。
 - **连字符算词分隔符**（词字符只有字母、数字、下划线）：`fix-me`、`the e2e-test is red` 命中；`fix_it` 这种标识符内部不命中。
-- **空白折叠**：匹配前把空白串折成单个空格，`help  me`、`help\nme` 都命中 `help me`；多词词条（`help me`、`write a`）内部的空白按「非字母数字下划线」类的分隔符处理（标点也算），所以 `help,me`、`help-me` 一样命中，而 `helpXme`、`help_me` 不命中。
+- **空白折叠**：匹配前把空白串折成单个空格，`help  me`、`help\nme` 都命中 `help me`；多词词条（`help me`）内部的空白按「非字母数字下划线」类的分隔符处理（标点也算），所以 `help,me`、`help-me` 一样命中，而 `helpXme`、`help_me` 不命中。
 - **NFKC 归一**：全角 `ｆｉｘ this bug`（中文输入法没切英文）命中 `fix`。
+
+注意闸门扫的是**整个回合的用户原文**，而发给 jev 的 state 会被 `stateChars`（默认 1200）截断——关键词落在截断窗口之外时，闸门照样命中、照样发起这次 jev 调用，只是 jev 看不到那个词。
 
 一次请求四道原子题：
 
@@ -161,7 +163,7 @@ jq -r 'select(.action=="advise") | [.route, .confidence] | @tsv' verdicts.ndjson
 | `toolName` | `'use_agent'` | gate 探的派发工具名 |
 | `provider` | `'spawn'` | gate 探的 subagent provider |
 | `triggers` | `['/dispatch', '/jev']` | 触发词表，任何 mode 下都优先于关键词闸门 |
-| `autoKeywords` | 中英双语任务动词词典（见用法节） | `auto` 的本地闸门词典；中文走子串、ASCII 走词边界（允许 `s`/`es`/`ed`/`ing`/`ment`/`ments` 一个后缀，`fix` 覆盖 `fixing` 但不命中 `prefix`），连字符算词分隔符，匹配前做 NFKC + 空白折叠（只作用于匹配副本），不分大小写；只在 `auto` 下被咨询 |
+| `autoKeywords` | 中英双语任务动词词典（见用法节） | `auto` 的本地闸门词典；中文走子串、ASCII 走词边界（允许 `s`/`es`/`ed`/`ing`/`ment`/`ments`/`d` 一个后缀，`fix` 覆盖 `fixing`、`remove` 覆盖 `removed`，但不命中 `prefix`），连字符算词分隔符，多词词条内部的词间分隔符是「任意一段非字母/数字/下划线字符」（所以 `help,me`/`help-me` 命中，而 `help_me`/`helpXme` 不命中），匹配前做 NFKC + 空白折叠（只作用于匹配副本），不分大小写；只在 `auto` 下被咨询 |
 | `timeoutMs` | `5000` | **单次 jev 调用**的死线（ms）。命中回合除了这次调用，还要叠加 roster 现读、脱敏组装、渲染注入这些开销——所以它不是"一个回合最坏会多等的毫秒数"，只是其中最大的一块；超时 fail-open 放行，turn 照常走，只是没有建议 |
 | `stateChars` | `1200` | state 上限 |
 | `model` | `null` | jev 模型 id，`null` 用 core 的钉版 |

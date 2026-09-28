@@ -111,11 +111,14 @@ function isAsciiWord(keyword: string): boolean {
 /**
  * One common inflection is allowed right after a matched ASCII keyword, so a
  * dictionary entry is the STEM and not one conjugation: `fixing`, `fixed`,
- * `tests`, `deployment` all hit `fix`/`test`/`deploy`. `prefix`, `address` and
- * `addressing` stay misses because the character after the stem is not one of
- * these — the boundary check then rejects it.
+ * `tests`, `deployment` all hit `fix`/`test`/`deploy`. `d` is in the set because
+ * the most common `-e` stems would otherwise miss their own past tense
+ * (`remove` + `ed` is "removeed", not `removed`; likewise `updated`,
+ * `generated`, `deleted`). `prefix`, `address` and `addressing` stay misses
+ * because the character after the stem is not one of these — the boundary check
+ * then rejects it.
  */
-const ASCII_INFLECTION = '(?:s|es|ed|ing|ment|ments)'
+const ASCII_INFLECTION = '(?:s|es|ed|ing|ment|ments|d)'
 
 /**
  * What counts as part of a word: letters, digits, underscore. Hyphens and

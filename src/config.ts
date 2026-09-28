@@ -101,13 +101,15 @@ export const DEFAULT_AUTO_KEYWORDS: readonly string[] = [
   'implement', 'fix', 'refactor', 'investigate', 'research', 'analyze', 'analyse',
   'optimize', 'optimise', 'deploy', 'test', 'write', 'add', 'remove', 'replace',
   'migrate', 'upgrade', 'review', 'debug', 'reproduce', 'verify', 'diagnose',
-  'help me', 'write a',
+  'help me',
   'build', 'commit', 'check', 'explain', 'summarize', 'generate', 'delete',
   'install', 'update', 'run', 'document',
   // Irregular forms the suffix rule cannot reach (`write` never matches
   // `writing`, `debug` never matches `debugging`, `analyze` never matches
-  // `analysis`).
-  'analysis', 'writing', 'debugging',
+  // `analysis`; likewise `run`/`running`, `commit`/`committed` and
+  // `verify`/`verified`, where the stem doubles a consonant or swaps `y` for
+  // `i`). Shipped as their own entries.
+  'analysis', 'writing', 'debugging', 'running', 'committed', 'verified',
 ]
 
 export interface DispatchConfig {

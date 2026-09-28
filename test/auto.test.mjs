@@ -281,6 +281,49 @@ test('E2: a kw: label is one clean line — CR/LF folded, blanks collapsed, capp
   }
 })
 
+test('E3: the kw: label is capped by CODE POINT — no lone surrogate reaches the NDJSON row', async () => {
+  // '🚀' is one astral code point but TWO UTF-16 units, so a unit-based cap and
+  // a code-point-based cap disagree. Both rows below are cut at unit 64 out of
+  // the middle of a rocket by `slice(0,64)`: the label then carries a lone high
+  // surrogate, JSON.stringify writes it as `\ud83d`, and `jq` refuses the WHOLE
+  // file (`Invalid \uXXXX\uXXXX surrogate pair escape`, exit 5) — which breaks
+  // the calibration flow the README teaches. `readVerdicts` proves the other
+  // half: the line still parses and is still one line.
+  const cases = [
+    // the reviewer's case: 43 code points, under the cap, so the correct
+    // implementation keeps the whole keyword and unit 64 still lands mid-rocket
+    { keyword: `bug${'🚀'.repeat(40)}`, codePoints: 43 },
+    // 83 code points: here the cap itself bites, and it must bite on a whole
+    // code point (64 = 'bug' + 61 whole rockets)
+    { keyword: `bug${'🚀'.repeat(80)}`, codePoints: 64 },
+  ]
+  for (const { keyword, codePoints } of cases) {
+    const jev = fakeJev({ dispatch: 0.85, agent: WORKHORSE })
+    const log = tempDir('dsh-agent-dispatch-auto-')
+    const { ctx, cleanup } = mount({
+      config: { autoKeywords: [keyword], logDir: log.dir },
+      deps: { fetch: jev.fetchImpl },
+    })
+    try {
+      await ctx.step({ agent: fakeAgent(), decision: ENTER([userMessage(`${keyword} please`)]) })
+      assert.equal(jev.calls.length, 1)
+      const rows = await readVerdicts(log.file('verdicts.ndjson'))
+      assert.equal(rows.length, 1)
+      const label = rows[0].trigger.slice('kw:'.length)
+      assert.ok(!/\p{Surrogate}/u.test(label), 'the label must not contain a lone surrogate')
+      assert.doesNotThrow(() => encodeURIComponent(label))
+      // the length bound still holds — and it is counted in code points
+      assert.ok([...label].length <= 64, 'the label is capped at 64 characters')
+      assert.equal([...label].length, codePoints)
+      // whole code points only: every rocket that survived is a full pair
+      assert.equal([...label].slice(3).every((cp) => cp === '🚀'), true)
+    } finally {
+      cleanup()
+      log.cleanup()
+    }
+  }
+})
+
 test('G: a capability gap on a keyword turn says what is missing ONCE per session, then goes quiet', async () => {
   const jev = fakeJev({ dispatch: 0.9 })
   const log = tempDir('dsh-agent-dispatch-auto-')

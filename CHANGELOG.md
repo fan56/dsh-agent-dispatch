@@ -13,87 +13,99 @@ All notable changes to this project are documented in this file.
   `/dispatch` and `/jev` triggers are matched first, are never gated, and keep
   their semantics in every mode (a capability gap still answers with a
   diagnostic, a `/jev` skip is still rendered).
-- `autoKeywords` defaults to a 54-entry bilingual task-verb dictionary: 29
-  Chinese phrases matched as substrings (Chinese has no word boundaries; single
-  characters like 写/改/加 are deliberately absent, they appear in small talk)
-  and 25 ASCII words matched on word boundaries (so `fix` misses `prefix` and
-  `add` misses `address`), both case-insensitively. The list is replaceable as
-  a whole. `mode: 'auto'` with an EMPTY list is a load error: a gate that looks
-  on and can never fire is exactly the silent mismatch this plugin refuses —
-  `once` is the mode for explicit requests only.
+- `autoKeywords` defaults to a 45-Chinese + 40-ASCII = 85-entry bilingual
+  task-verb dictionary: Chinese phrases matched as substrings (Chinese has no
+  word boundaries; single characters like 写/改/加 are deliberately absent, they
+  appear in small talk) and ASCII words matched on word boundaries (so `fix`
+  misses `prefix` and `add` misses `address`), both case-insensitively. The list
+  is replaceable as a whole. `mode: 'auto'` with an EMPTY list is a load error: a
+  gate that looks on and can never fire is exactly the silent mismatch this
+  plugin refuses — `once` is the mode for explicit requests only. The list was
+  revised after real-machine probing found a whole band of the most common task
+  phrasings silent (false negatives) while a couple of entries were far too
+  broad: added the Chinese 修改/检查/删除/移除/去掉/报错/生成/梳理/提交/构建/安装/总结/对比/看一下/看看/为什么会;
+  removed 为什么 (subsumed by 为什么会) and split 麻烦 into 麻烦你 + 麻烦帮;
+  added the ASCII build/commit/check/explain/summarize/generate/delete/install/
+  update/run/document plus the irregular forms analysis/writing/debugging/
+  running/committed/verified. Removed `can you` (English politeness covers
+  nearly every sentence, so it was the highest false-positive entry) and the
+  dead-weight `write a` — it sat behind `write`, which matches every turn the
+  phrase could, so it was unreachable, and its one-letter last word was the only
+  way "write as much as you like" could forge a `kw:write a` label. The
+  widening is deliberate and follows an ASYMMETRIC cost model: a false hit costs
+  one jev call that in all likelihood comes back `skip`, while a miss costs the
+  turn the whole feature — the user gets nothing and cannot tell a miss from a
+  broken install.
 - `auto` without `logDir` logs one extra boot info line. The gate's misses are
   invisible by design, so the verdict log is the only channel that says which
   keywords earn their call.
 - Keyword-hit turns record `trigger` as `"kw:<keyword>"` in the verdict log
   (explicit turns still record the trigger word itself) — the label that makes
-  the gate calibratable. A keyword-hit turn that jev skips still renders
-  nothing and logs no `skip —` info line, and a failed capability gate stays
-  silent for it too: it never asked for a verdict, so a gap in the subagent
-  stack is not its business. No new threshold keys — the worst-case added
-  latency is still bounded by the existing `timeoutMs` (default 5000).
-- docs: the package's `cordis.patch.yml` comment now describes both `once` and
-  `auto` (local gate semantics included); `config: {}` stays empty.
-- docs: README (zh/en) — third mode documented in Usage, `autoKeywords` row
-  added and the `mode` row rewritten in both config tables, Privacy now states
-  that `auto` only sends a turn that cleared the local gate (the gate itself is
-  zero-network), verdict-log section documents the `kw:` label. This supersedes
-  the 0.1.0 note that `auto` was deliberately out of scope — it lands now,
-  gated locally instead of classifying every turn.
-- docs: the `timeoutMs` config row still said `2000` and justified it as
-  "shorter than the core's 5s default"; the default has been 5000 since 0.1.1,
-  so the row and the argument built on it now match the code.
-- fix: the default `autoKeywords` dictionary was revised after real-machine
-  probing found a whole band of the most common task phrasings silent (false
-  negatives) while a couple of entries were far too broad. Added Chinese
-  修改/检查/删除/移除/去掉/报错/生成/梳理/提交/构建/安装/总结/对比/看一下/看看/为什么会;
-  removed 为什么 (subsumed by 为什么会) and split 麻烦 into 麻烦你 + 麻烦帮.
-  Added ASCII build/commit/check/explain/summarize/generate/delete/install/
-  update/run/document; removed `can you` (English politeness covers nearly every
-  sentence, so it was the highest false-positive entry); added the irregular
-  forms analysis/writing/debugging. Kept: every other entry, and the rule that a
-  single Chinese character never ships (写/改/加/删 fire on small talk). The
-  dictionary is now 45 Chinese + 38 ASCII = 83 entries. The widening is
-  deliberate and follows an ASYMMETRIC cost model: a false hit costs one jev
-  call that in all likelihood comes back `skip`, while a miss costs the turn the
-  whole feature — the user gets nothing and cannot tell a miss from a broken
-  install.
-- fix: ASCII gate matching was widened in three ways. One common inflection is
-  now allowed after a stem (`s`/`es`/`ed`/`ing`/`ment`/`ments`), so
+  the gate calibratable. The label is user configuration, so it is cleaned
+  before it is written: CR/LF become spaces, whitespace collapses, and it is
+  capped at 64 CHARACTERS. The cap counts code points, not UTF-16 code units —
+  a cut between the halves of a surrogate pair leaves a lone surrogate in the
+  row, and `jq` then rejects the WHOLE file the README teaches you to read
+  (`Invalid \uXXXX\uXXXX surrogate pair escape`, exit 5). A keyword-hit turn
+  that jev skips still renders nothing and logs no `skip —` info line.
+- No new threshold keys: a keyword hit adds one jev call bounded by the existing
+  `timeoutMs` (default 5000), on top of the local roster read, the redaction
+  pass and the render. That call is the LARGEST part of a hit turn's added wait,
+  but it is not a worst-case bound on the whole turn.
+- UPGRADE NOTE: `mode: 'auto'` is a validation ERROR in 0.1.3 (`MODES` is
+  `['off', 'once']`), so a config carrying it does not load today. After this
+  upgrade it loads, and it really takes effect: every ordinary turn that clears
+  the local keyword gate sends that turn's user text to TypeSafe Jev. If you
+  ever wrote `mode: 'auto'` into a config, decide on purpose whether you want
+  that outbound channel — set a `logDir` if you also want the calibration
+  evidence, or go back to `once` so that explicit `/dispatch` and `/jev`
+  requests stay the only turns that leave the machine.
+- fix: ASCII gate matching was widened in four ways. One common inflection is
+  now allowed after a stem (`s`/`es`/`ed`/`ing`/`ment`/`ments`/`d`), so
   `fixing`/`fixed`/`tests`/`deployment`/`refactoring` hit while `prefix`,
-  `address`, and `addressing` still miss; word boundaries are now built from
-  letters, digits, and underscore only, so a hyphen separates words (`fix-me`,
-  `the e2e-test is red`) while the identifier `fix_it` still does not match; and
-  matching runs on a folded copy of the turn — NFKC (a full-width `ｆｉｘ` hits
-  `fix`) with whitespace runs collapsed (so `help  me` and `help\nme` hit
-  `help me`). The state sent to jev and every log line still carry the user's
-  bytes unchanged.
+  `address`, and `addressing` still miss — and `d` is what makes an `-e` stem
+  recognize its own past tense, because the plain `ed` alternative spells
+  "removeed": `removed`, `deleted`, `updated`, `generated`, `migrated`,
+  `upgraded`, `replaced`, `reproduced`, `investigated`, `optimized`, `analysed`
+  and `diagnosed` were all silent misses before it. Second, word boundaries are
+  now built from letters, digits, and underscore only, so a hyphen separates
+  words (`fix-me`, `the e2e-test is red`) while the identifier `fix_it` still
+  does not match. Third, the words of a multi-word entry are separated by any
+  run of characters that are not letters/digits/underscores, so `help,me` and
+  `help-me` hit while `help_me` and `helpXme` do not. Fourth, matching runs on a
+  folded copy of the turn — NFKC (a full-width `ｆｉｘ` hits `fix`) with
+  whitespace runs collapsed (so `help  me` and `help\nme` hit `help me`). The
+  state sent to jev still carries the user's text as typed, redaction and the
+  `stateChars` cap aside; only the `kw:` label is cleaned and truncated.
 - fix: an `auto` keyword hit that runs into an incomplete subagent stack (wrong
   `agentsDir`, empty roster, `use_agent` not visible, delegation depth spent) no
-  longer stays invisible for a whole session. The first such turn logs ONE info
-  line naming what is missing and stating that keyword-hit turns stay silent by
-  design; later hits do not repeat it. Nothing is injected and no verdict-log row
-  is written for those turns, exactly as before.
-- fix: the `kw:<keyword>` verdict-log label is cleaned before it is written —
-  CR/LF become spaces, whitespace collapses, and the label is capped at 64
-  characters — because the label is user configuration and a raw newline in it
-  made the NDJSON line unreadable as calibration evidence.
-- UPGRADE NOTE: `mode: 'auto'` was a validation ERROR in earlier versions; it is
-  supported now, so a profile that upgraded with `auto` parked in its config will
-  start classifying turns on the next boot. Add a `logDir` if you want the
-  calibration evidence, or set the mode back to `once` deliberately.
-- docs: README (zh/en) — the default dictionary list is updated on both sides
-  (word for word, in order) and followed by the four matching rules (ASCII
-  suffix, hyphen as a separator, whitespace folding, NFKC); the capability-gate
-  section now states the one-time info line instead of claiming total silence;
-  Privacy says plainly that under `auto` a hit is sent even when the user never
-  typed `/dispatch`; the `timeoutMs` row no longer calls itself the worst-case
-  per-turn wait (it bounds the jev call, and a hit turn also pays the roster
-  read, the redaction pass, and the render); `README.en.md`'s `mode` row said
-  `warns at boot` where the code logs an info line, which this repo's own
-  no-warning rule makes wrong. A test now parses both READMEs' dictionary lists
-  and fails if either drifts from the code.
-- docs: `cordis.patch.yml`'s comment describes the one-time gap line and the
-  widened matching rules; `config: {}` stays empty.
+  longer stays invisible. The first such turn logs ONE info line naming what is
+  missing and stating that keyword-hit turns stay silent by design; later hits do
+  not repeat it. The flag is per plugin instance — a remount logs it again, a new
+  session does not — so the line says process, not session. Nothing is injected
+  and no verdict-log row is written for those turns, exactly as before.
+- docs: README (zh/en) — third mode documented in Usage; the `autoKeywords` row
+  added and the `mode` row rewritten in both config tables (the English `mode`
+  row said `warns at boot` where the code logs an info line, which this repo's
+  own no-warning rule makes wrong); Privacy now states that `auto` only sends a
+  turn that cleared the local gate (the gate itself is zero-network), and says
+  plainly that a hit is sent even when the user never typed `/dispatch`; the
+  verdict-log section documents the `kw:` label; the default dictionary list is
+  updated on both sides (word for word, in order, with a test parsing both
+  READMEs and failing if either drifts from the code) and followed by the four
+  matching rules (ASCII suffix, hyphen as a separator, whitespace folding with
+  the multi-word separator, NFKC); the capability-gate section states the
+  one-time
+  info line instead of claiming total silence; and the `timeoutMs` row no longer
+  calls itself the worst-case per-turn wait (it bounds the jev call, and a hit
+  turn also pays the roster read, the redaction pass, and the render) — the row
+  had still said `2000` and justified it as "shorter than the core's 5s
+  default", where the default has been 5000 since 0.1.1. This supersedes the
+  0.1.0 note that `auto` was deliberately out of scope — it lands now, gated
+  locally instead of classifying every turn.
+- docs: the package's `cordis.patch.yml` comment describes both `once` and
+  `auto` (local gate semantics, the one-time gap line, and the widened matching
+  rules); `config: {}` stays empty.
 
 ## 0.1.3 - 2026-09-28
 

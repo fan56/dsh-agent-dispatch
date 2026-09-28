@@ -142,6 +142,23 @@ const KEYWORD_CASES = [
   ['tests is the same noun as test', 'run the tests', ['test'], 'test'],
   ['deployment is the same noun as deploy', 'deployment is broken', ['deploy'], 'deploy'],
   ['refactoring is the same verb as refactor', 'refactoring the auth module', ['refactor'], 'refactor'],
+  // `d` is in the suffix set because an `-e` stem + `ed` is NOT the stem + `ed`:
+  // the plain `ed` alternative spells "removeed", so every one of these verbs
+  // was a silent miss before `d` joined the set.
+  ['removed is the past tense of remove', 'removed the stale flag', ['remove'], 'remove'],
+  ['deleted is the past tense of delete', 'deleted the branch', ['delete'], 'delete'],
+  ['updated is the past tense of update', 'updated the config', ['update'], 'update'],
+  ['generated is the past tense of generate', 'generated the client', ['generate'], 'generate'],
+  ['migrated is the past tense of migrate', 'migrated the schema', ['migrate'], 'migrate'],
+  ['upgraded is the past tense of upgrade', 'upgraded the dependency', ['upgrade'], 'upgrade'],
+  ['replaced is the past tense of replace', 'replaced the timer', ['replace'], 'replace'],
+  ['reproduced is the past tense of reproduce', 'reproduced the failure', ['reproduce'], 'reproduce'],
+  ['investigated is the past tense of investigate', 'investigated the leak', ['investigate'], 'investigate'],
+  ['optimized is the past tense of optimize', 'optimized the query', ['optimize'], 'optimize'],
+  ['analysed is the past tense of analyse', 'analysed the trace', ['analyse'], 'analyse'],
+  ['diagnosed is the past tense of diagnose', 'diagnosed the hang', ['diagnose'], 'diagnose'],
+  // ...and `d` must not open a malformed match: `address` still misses `add`.
+  ['the d suffix does not make address hit add', 'updated the address field', ['add'], null],
   ['analysis is shipped as its own entry', 'analysis is wrong', ['analysis'], 'analysis'],
   // CJK next to Latin: a Chinese entry matches as a substring, even glued to a word.
   ['a Chinese keyword matches with Latin right after it', '帮我fix一下', ['帮我'], '帮我'],
@@ -160,6 +177,12 @@ const KEYWORD_CASES = [
   ['an anchored-looking keyword is escaped', 'it costs $5+ now', ['$5+'], '$5+'],
   ['the same keyword does not hit a different amount', 'it costs $5 now', ['$5+'], null],
   ['a multi-word keyword is matched as one phrase', 'x a b y', ['a b'], 'a b'],
+  // Known tradeoff, pinned so it is not "fixed" by accident: the suffix is
+  // appended to the LAST word of a multi-word entry, so a one-letter last word
+  // lets the following word's first letter pose as a suffix. This is why the
+  // shipped dictionary no longer carries `write a` (it was unreachable dead
+  // weight behind `write` anyway).
+  ['a one-letter last word lets the next word pose as a suffix', 'write as much as you like', ['write a'], 'write a'],
 ]
 
 test('the keyword gate table: boundaries, inflections, folding, escapes', () => {
@@ -167,6 +190,34 @@ test('the keyword gate table: boundaries, inflections, folding, escapes', () => 
     const hit = findKeyword([userMessage(text)], keywords)
     assert.equal(hit === null ? null : hit.keyword, expected, name)
   }
+})
+
+test('the shipped dictionary covers the -e past tense and the irregular forms', async () => {
+  const { DEFAULT_AUTO_KEYWORDS } = await import('../lib/index.js')
+  // Every one of these was a silent miss before `d` joined the suffix set (the
+  // `ed` alternative spells "removeed") or before the irregular form shipped.
+  // The hit reports the DICTIONARY ENTRY (the stem), not the surface form.
+  const inflected = [
+    ['removed', 'remove'], ['deleted', 'delete'], ['updated', 'update'], ['generated', 'generate'],
+    ['running', 'running'], ['committed', 'committed'], ['verified', 'verified'],
+  ]
+  for (const [word, entry] of inflected) {
+    const hit = findKeyword([userMessage(`please ${word} it`)], DEFAULT_AUTO_KEYWORDS)
+    assert.equal(hit === null ? null : hit.keyword, entry, word)
+  }
+  // The widened suffix set must not leak into the documented counterexamples.
+  assert.equal(findKeyword([userMessage('prefix, address, suffix')], DEFAULT_AUTO_KEYWORDS), null)
+})
+
+test('the shipped dictionary dropped the dead-weight write a entry', async () => {
+  const { DEFAULT_AUTO_KEYWORDS } = await import('../lib/index.js')
+  // `write a` was unreachable: `write` sits earlier in the dictionary and
+  // matches every turn a `write a` entry could, so the only thing the entry
+  // could ever do was let "write as much as you like" forge a `kw:write a`
+  // label via the one-letter-last-word suffix path. The phrase still clears the
+  // gate — through `write`, which is the honest label for it.
+  assert.equal(DEFAULT_AUTO_KEYWORDS.includes('write a'), false)
+  assert.deepEqual(findKeyword([userMessage('write as much as you like')], DEFAULT_AUTO_KEYWORDS), { keyword: 'write' })
 })
 
 test('the gate keeps message order ahead of dictionary order (first hit wins)', () => {
