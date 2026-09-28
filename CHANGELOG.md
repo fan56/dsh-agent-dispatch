@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+## 0.1.1 - 2026-09-28
+
+- `timeoutMs` default 2000 → 5000: real-machine verdicts measured cold-start
+  spikes past the 2s wire floor (typesafe native); the call sits inline in the
+  pre-step waterfall but fails open either way, and a cold call now lands
+  instead of silently timing out. The key was already configurable.
+
+## 0.1.0 - 2026-09-28
 ## 0.1.0 - 2026-09-28
 
 First release — the ex-ante dispatch leg of the dsh jev effort. Scope per the

@@ -75,10 +75,11 @@ export interface DispatchConfig {
   /** Turn triggers parsed from the user's own text; each must start with `/`. */
   triggers: string[]
   /**
-   * Total deadline for one jev call, in ms. Deliberately well under
-   * `@aiwayds/dsh-jev-core`'s 5s default: the call sits inline in the
-   * pre-step waterfall, so a slow verdict must not hold the turn open. Raise
-   * it once the verdict log shows real latencies clearing it.
+   * Total deadline for one jev call, in ms. Real-machine verdicts
+   * (2026-09-28, typesafe native) measured cold-start spikes well past 2s,
+   * so the default matches the core's 5s; a slow verdict still fails open
+   * and the turn proceeds unrouted, but a cold call now lands instead of
+   * timing out on the wire floor.
    */
   timeoutMs: number
   /** Head cap for the state text sent to jev. */
@@ -103,7 +104,7 @@ export function defaults(): DispatchConfig {
     toolName: 'use_agent',
     provider: 'spawn',
     triggers: ['/dispatch', '/jev'],
-    timeoutMs: 2_000,
+    timeoutMs: 5_000,
     stateChars: 1_200,
     model: null,
     thresholds: { ...DEFAULT_THRESHOLDS },
