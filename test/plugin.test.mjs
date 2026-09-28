@@ -122,7 +122,7 @@ test('an aborted turn is returned untouched', async () => {
   }
 })
 
-test('an ordinary turn is silent: no call, no message, no log', async () => {
+test('in once mode an ordinary turn is silent: no call, no message, no log', async () => {
   const jev = fakeJev({ dispatch: 0.9 })
   const log = tempDir('dsh-agent-dispatch-plugin-')
   const { ctx, cleanup } = mount({ config: { logDir: log.dir }, deps: { fetch: jev.fetchImpl } })

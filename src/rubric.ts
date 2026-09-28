@@ -1,5 +1,6 @@
 /**
- * `@aiwayds/dsh-agent-dispatch` — the rubric and the turn triggers.
+ * `@aiwayds/dsh-agent-dispatch` — the rubric, the turn triggers, and the local
+ * `auto` keyword gate.
  *
  * Four atomic questions in ONE request (the wire contract bills and waits once):
  *
@@ -62,7 +63,10 @@ function kindOf(trigger: string): TriggerKind {
 /**
  * Find an explicit trigger in the turn's user messages. Returns null when no
  * PLAIN user turn starts with a configured trigger — the caller then leaves the
- * turn completely untouched (no call, no data sharing, no log line).
+ * turn completely untouched (no call, no data sharing, no log line). Under
+ * `mode: 'auto'` a turn without a trigger is not finished with yet: it still
+ * has to clear the local keyword gate (`findKeyword`) below, which is the only
+ * difference `auto` adds at this layer.
  *
  * Word boundary: `/jev` must not fire on `/jevis`, and a trigger followed by
  * nothing but punctuation is still a trigger.
@@ -83,6 +87,59 @@ export function findTrigger(
       const after = text[trigger.length]
       if (after !== undefined && /[A-Za-z0-9_-]/.test(after)) continue
       return { kind: kindOf(trigger), task: text.slice(trigger.length).trim(), trigger }
+    }
+  }
+  return null
+}
+
+/** A local keyword-gate hit, shaped like `Trigger` so the caller logs the same way. */
+export interface KeywordHit {
+  /** The dictionary entry that matched, verbatim as configured. */
+  keyword: string
+}
+
+/** Escape a substring for literal use inside a RegExp (keywords are user config). */
+function literal(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Whether a keyword is printable ASCII, and therefore word-bounded at match time. */
+function isAsciiWord(keyword: string): boolean {
+  return !/[^\x20-\x7E]/.test(keyword)
+}
+
+/**
+ * The local gate for `mode: 'auto'`: does this turn even mention work?
+ *
+ * Zero network, zero clock, zero state — a deterministic string match over the
+ * turn's PLAIN user text, the same population `findTrigger` reads, so this
+ * plugin's own injected advice can never re-arm the gate. The first hit wins
+ * (message order, then dictionary order), matching `findTrigger`'s style.
+ *
+ * Matching is deliberately two-mode: ASCII keywords are word-bounded, so `fix`
+ * misses `prefix` and `add` misses `address`; Chinese has no word boundaries,
+ * so a substring IS a word there. Both sides are lowercased first.
+ * @param messages - the claimed messages for this step.
+ * @param keywords - the `autoKeywords` dictionary (ignored when not `auto`).
+ * @returns the hit keyword, or null when the turn stays local and silent.
+ */
+export function findKeyword(
+  messages: readonly DispatchMessage[] | null | undefined,
+  keywords: readonly string[],
+): KeywordHit | null {
+  for (const message of messages ?? []) {
+    if (!isPlainUserMessage(message)) continue
+    const text = messageText(message).toLowerCase()
+    if (text.length === 0) continue
+    for (const keyword of keywords ?? []) {
+      if (typeof keyword !== 'string' || keyword === '') continue
+      const needle = keyword.toLowerCase()
+      if (!isAsciiWord(needle)) {
+        if (text.includes(needle)) return { keyword }
+        continue
+      }
+      const bounded = new RegExp(`(?<![A-Za-z0-9_-])${literal(needle)}(?![A-Za-z0-9_-])`)
+      if (bounded.test(text)) return { keyword }
     }
   }
   return null

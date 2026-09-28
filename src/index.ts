@@ -9,6 +9,15 @@
  * message is APPENDED after every other message of the step, so the advice
  * sits where the agent reads it last.
  *
+ * Under `mode: 'auto'` the same path serves ordinary turns, but only after a
+ * LOCAL keyword gate clears: a plain turn whose text hits an `autoKeywords`
+ * entry is worth a verdict, and one that hits nothing is returned untouched in
+ * silence — no call, no injection, no log line. Explicit triggers are matched
+ * first and are never gated, so `/jev` and `/dispatch` keep their semantics
+ * (rendered skip, capability diagnostic) in every mode. The gate's silent half
+ * is also why `auto` wants a `logDir`: the verdict log is the only place the
+ * cost of a keyword hit becomes visible.
+ *
  * The plugin owns no delegation machinery. It names an agent and the shape of
  * the `use_agent` call; `use_agent` (dsh-subagent-registry) does the spawning,
  * and the capability gate re-probes its live visibility on every request
@@ -36,7 +45,7 @@ import { checkDispatchCapabilities, isSubagentSession, type CapabilityServices, 
 import { appendVerdict, verdictId, type LoggerLike, type VerdictRecord } from './log.ts'
 import { failed, decide, type PolicyVerdict } from './policy.ts'
 import { buildState, taskExcerpt, type DispatchMessage } from './redact.ts'
-import { agentOptions, buildQuestions, findTrigger, resolvePick, type Trigger } from './rubric.ts'
+import { agentOptions, buildQuestions, findKeyword, findTrigger, resolvePick, type KeywordHit, type Trigger } from './rubric.ts'
 import { loadRoster, resolveAgentsDir, type Roster } from './roster.ts'
 import { renderAdvice, renderHold, renderSkip, renderUnavailable } from './render.ts'
 
@@ -148,6 +157,14 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
 
   const buildMessage = deps.messageBuilder ?? pluginMessage
   const logDir = loggingEnabled(config) ? config.logDir : null
+  const auto = config.mode === 'auto'
+  if (auto && logDir === null) {
+    // The gate's misses are invisible BY DESIGN (zero calls, zero lines), so
+    // the verdict log is the only channel that says which keywords earn their
+    // call. Without it, `auto` runs uncalibrated — say so once at boot rather
+    // than letting the user discover it by feel.
+    logger.info?.(`${PLUGIN_NAME}: mode auto without logDir — which autoKeywords hits are worth a jev call cannot be calibrated without the verdict log; set logDir to record them`)
+  }
   let warnedNoFactory = false
 
   // prepend: this listener runs after the downstream listeners have produced
@@ -164,11 +181,16 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
       // is noise at best.
       if (config.skipSubagentSessions && isSubagentSession(agent)) return decision as never
 
+      // Explicit triggers are matched first and are never gated: `/dispatch`
+      // and `/jev` mean the same thing in every mode.
       const trigger = findTrigger(decision.messages, config.triggers)
-      // mode "once": only turns that explicitly ask classify — one call per
-      // request, everything else passes through untouched (no call, no data
-      // sharing, no log line).
-      if (trigger === null) return decision as never
+      // mode "once": only turns that explicitly ask get classified — one call
+      // per request, everything else passes through untouched (no call, no
+      // data sharing, no log line). mode "auto": an ordinary turn has to clear
+      // the local keyword gate first, and a miss is the SAME untouched return —
+      // that is the whole difference between `auto` and asking about every turn.
+      const keyword = trigger === null && auto ? findKeyword(decision.messages, config.autoKeywords) : null
+      if (trigger === null && keyword === null) return decision as never
 
       // jev-optional leg #2: the key was there at boot and is gone now.
       if (!isConfigured(keySources)) return decision as never
@@ -181,13 +203,16 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
       }
       const capabilities = checkDispatchCapabilities(services, agent, config, roster)
       if (!capabilities.ok) {
-        // Ordinary turns would stay completely silent here — no injection, no
-        // call, no log. In `once` mode every turn that got this far asked
-        // explicitly, so it gets the diagnostic naming what is missing.
+        // An auto turn arrived here through the local gate and never asked for
+        // a verdict, so a gap in the subagent stack is not its business: it
+        // stays completely silent — no diagnostic, no info line, no log row.
+        // Every explicit turn, by contrast, DID ask, so it gets the diagnostic
+        // naming exactly what is missing.
+        if (trigger === null) return decision as never
         const reason = capabilities.missing.join('; ')
         if (logDir !== null) {
           await appendVerdict(logDir, verdictRecord({
-            config, agent, trigger,
+            config, agent, trigger, keyword,
             verdict: failed('unavailable', reason),
             latencyMs: null,
           }), logger)
@@ -198,7 +223,7 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
         return { ...decision, messages: [...(decision.messages ?? []), diagnostic] } as never
       }
 
-      const state = buildState(decision.messages, cwd, config.stateChars, config.redactPatterns, trigger.task)
+      const state = buildState(decision.messages, cwd, config.stateChars, config.redactPatterns, trigger?.task ?? '')
       if (state === '') return decision as never // nothing user-authored to judge
 
       const options = agentOptions(roster)
@@ -243,7 +268,7 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
       // message nobody will read is worse than none.
       if (aborted(payload.signal)) return decision as never
 
-      const excerpt = taskExcerpt(decision.messages, trigger.task, config.redactPatterns)
+      const excerpt = taskExcerpt(decision.messages, trigger?.task ?? '', config.redactPatterns)
       const renderOptions = { toolName: config.toolName, task: excerpt, includeDismissLine: config.includeDismissLine }
       let addition: DispatchMessage | null = null
       if (verdict.action === 'advise') {
@@ -252,9 +277,10 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
       } else if (verdict.action === 'hold') {
         addition = await buildMessage(renderHold(verdict, renderOptions))
         logger.info?.(`${PLUGIN_NAME}: hold — ${verdict.reason}`)
-      } else if (verdict.action === 'skip' && trigger.kind === 'jev') {
+      } else if (verdict.action === 'skip' && trigger?.kind === 'jev') {
         // `/jev` is the free decision request: its verdict is the answer, so a
-        // miss is rendered too. `/dispatch` only wants the recommendation.
+        // miss is rendered too. `/dispatch` only wants the recommendation, and
+        // an auto turn (trigger null) never wanted the verdict at all.
         addition = await buildMessage(renderSkip(verdict, renderOptions))
       }
       if (addition === null && (verdict.action === 'advise' || verdict.action === 'hold') && !warnedNoFactory) {
@@ -267,7 +293,7 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
         // decided, `delivered` is whether the recommendation actually reached
         // the turn. The two are different facts.
         await appendVerdict(logDir, verdictRecord({
-          config, agent, trigger, verdict, latencyMs,
+          config, agent, trigger, keyword, verdict, latencyMs,
           ...(verdict.action === 'advise' || verdict.action === 'hold' ? { delivered: addition !== null } : {}),
         }), logger)
       }
@@ -275,7 +301,10 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
       if (addition !== null) {
         return { ...decision, messages: [...(decision.messages ?? []), addition] } as never
       }
-      if (verdict.action === 'skip') logger.info?.(`${PLUGIN_NAME}: skip — ${verdict.reason}`)
+      // An auto turn's skip is silent: it never asked for a verdict, so the
+      // "skip —" line would be commentary on a question nobody posed. The
+      // verdict log still records it (above), which is where it belongs.
+      if (verdict.action === 'skip' && trigger !== null) logger.info?.(`${PLUGIN_NAME}: skip — ${verdict.reason}`)
       return decision as never
     } catch (error) {
       // Last line of defence: a bug here is still just a turn that proceeds
@@ -286,11 +315,17 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
   }, { prepend: true })
 }
 
-/** Assemble one NDJSON row. Answers are kept whole: the log is the calibrator. */
+/**
+ * Assemble one NDJSON row. Answers are kept whole: the log is the calibrator.
+ * `trigger` is the explicit trigger word (`/dispatch`) or the local gate's
+ * `kw:<keyword>` label for a keyword-hit auto turn — the log has to be able to
+ * answer "which keyword's hits were worth a call", so the two are distinguishable.
+ */
 function verdictRecord(input: {
   config: DispatchConfig
   agent?: DispatchAgentLike
-  trigger: Trigger
+  trigger: Trigger | null
+  keyword: KeywordHit | null
   verdict: PolicyVerdict
   latencyMs: number | null
   delivered?: boolean
@@ -300,7 +335,7 @@ function verdictRecord(input: {
     id: verdictId(),
     session: input.agent?.session?.id ?? null,
     mode: input.config.mode,
-    trigger: input.trigger.trigger,
+    trigger: input.trigger?.trigger ?? (input.keyword === null ? null : `kw:${input.keyword.keyword}`),
     action: input.verdict.action,
     reason: input.verdict.reason,
     confidence: input.verdict.confidence,

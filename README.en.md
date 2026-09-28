@@ -63,6 +63,24 @@ The default `mode: off` registers nothing and shares nothing. Switch to `once` a
 - `/dispatch <task>` — wants the recommendation (a "do not delegate" verdict injects nothing)
 - `/jev <question>` — free decision request; a "do not delegate" verdict is **rendered too**, because the misses are what calibrates the thresholds
 
+The third mode is `auto`: every **ordinary user turn** clears a **local** keyword gate first (plain string matching, zero network), and only a hit on an `autoKeywords` entry is worth asking Jev about; **a miss is completely silent** — zero calls, zero injection, zero log lines, zero data shared. That is the entire difference between it and "ask jev about every turn".
+
+`auto` has two preconditions:
+
+1. **`autoKeywords` must be non-empty** — an empty dictionary is a mode that looks on and can never fire, so it is a load-time error (use `mode: once` to handle explicit requests only). The default dictionary is non-empty, so `mode: auto` without configuring `autoKeywords` is valid.
+2. **Configure `logDir` as well** — a miss is invisible by design, and the verdict log is the only place that can answer "which keyword's hits were really worth asking about". With `auto` and no `logDir`, boot logs one extra info line.
+
+Explicit triggers are matched first in every mode and are never gated; their semantics are kept word for word: an explicit turn still gets the diagnostic when the capability gate fails, and a `/jev` skip is still rendered.
+
+The default `autoKeywords` dictionary (replaceable as a whole):
+
+- Chinese / non-ASCII (**substring** match — Chinese has no word boundaries):
+  `帮我` `请帮` `麻烦` `实现` `修复` `排查` `调查` `调研` `研究` `分析` `优化` `重构` `部署` `发布` `测试` `迁移` `升级` `接入` `集成` `审查` `评审` `复现` `定位` `验证` `写一个` `改一下` `加一个` `跑一下` `为什么`
+- ASCII (**word-bounded**, case-insensitive):
+  `implement` `fix` `refactor` `investigate` `research` `analyze` `analyse` `optimize` `optimise` `deploy` `test` `write` `add` `remove` `replace` `migrate` `upgrade` `review` `debug` `reproduce` `verify` `diagnose` `help me` `can you` `write a`
+
+Single Chinese characters are deliberately excluded — 写/改/加/删 are everywhere in small talk, and a one-character gate would fire on ordinary conversation. The bias is conservative: a missed keyword costs one piece of advice, a false hit pays for a call nobody asked for.
+
 One request, four atomic questions:
 
 | question | type | asks | threshold (configurable) |
@@ -95,7 +113,7 @@ A suggestion is only worth a jev call when the agent can really dispatch. All **
 3. the roster is non-empty (no agent to hand it to is worse than silence);
 4. delegation depth is left: session depth + 1 ≤ the host's cap.
 
-When any leg fails, an explicit request gets a diagnostic naming what is missing; **ordinary turns stay completely silent** — no call, no injection, no log. Leg 4 comes in two halves: the gate checks the target-independent necessary condition, and after the pick the recommendation is re-checked against that agent's own `deep` (`use_agent` always passes an explicit `maxDepth = childDepth + deep`, so "session depth + 1 + agent.deep ≤ host cap" is the arithmetic that can actually reject the dispatch).
+When any leg fails, an explicit request gets a diagnostic naming what is missing; **ordinary turns stay completely silent** — no call, no injection, no log — and under `auto` a turn that came in through the keyword gate is equally silent (it never asked for a verdict, so a gap in the subagent stack is not its business), not even a verdict-log row. Leg 4 comes in two halves: the gate checks the target-independent necessary condition, and after the pick the recommendation is re-checked against that agent's own `deep` (`use_agent` always passes an explicit `maxDepth = childDepth + deep`, so "session depth + 1 + agent.deep ≤ host cap" is the arithmetic that can actually reject the dispatch).
 
 ## Where the roster comes from
 
@@ -113,6 +131,8 @@ Set `logDir` to turn it on; each verdict appends one NDJSON line to `verdicts.nd
 
 `action` is what jev decided; `delivered` is whether the advice actually reached the turn — two different facts. A log failure is a warn and never affects the turn. What the log cannot see is whether the agent **followed** the advice; that is a routing ledger's job.
 
+`trigger` is the explicit trigger word itself (`/dispatch`, `/jev`); under `auto`, a turn matched by the local keyword gate records `kw:<keyword>` (e.g. `kw:修复`) — which is what lets the log answer "which keyword's hits were really worth dispatching", the only calibration evidence `auto` has.
+
 Calibrating from the log:
 
 ```sh
@@ -121,18 +141,21 @@ jq -r 'select(.action=="advise") | [.route, .confidence] | @tsv' verdicts.ndjson
 
 ## Privacy
 
-What leaves the machine: the turn's **plain user text only** (plugin- and tool-authored messages never enter the state; non-text content is never sent), the workspace path, and the roster criteria. The whole assembly is redacted and only then truncated to `stateChars` (default 1200). Built-ins cover `sk-` / `pk_` / `ghp_` / `github_pat_` / `AKIA` / `Bearer` / `api_key=` / long base64; `redactPatterns` adds more.
+What leaves the machine: the turn's **plain user text only** (plugin- and tool-authored messages never enter the state, so advice this plugin injected is never classified again; non-text content is never sent), the workspace path, and the roster criteria. The whole assembly is redacted and only then truncated to `stateChars` (default 1200). Built-ins cover `sk-` / `pk_` / `ghp_` / `github_pat_` / `AKIA` / `Bearer` / `api_key=` / long base64; `redactPatterns` adds more.
+
+**When anything leaves at all**: `off` never sends; `once` sends only on an explicit `/dispatch` `/jev` turn; `auto` sends only on a turn that **hit a local keyword** (the payload is identical to `once`, cwd included). **The local keyword gate itself issues no network request** — a miss is one in-process string comparison and does not even leave a log line. Subagent sessions, aborted turns, and `auto` turns whose capability gate fails send nothing either.
 
 ## Configuration
 
 | key | default | meaning |
 |---|---|---|
-| `mode` | `'off'` | `off` / `once` (`auto` is in fog, waiting for the verdict log) |
+| `mode` | `'off'` | `off` / `once` / `auto`. `auto` = a local keyword gate: only a hit asks Jev, a miss is completely silent; requires a non-empty `autoKeywords`, and warns at boot that it cannot be calibrated without `logDir` |
 | `agentsDir` | `'~/.dsh/agents'` | the default literal resolves against the dsh home, so `DSH_HOME` keeps working |
 | `toolName` | `'use_agent'` | the dispatch tool the gate probes |
 | `provider` | `'spawn'` | the subagent provider the gate probes |
-| `triggers` | `['/dispatch', '/jev']` | trigger words |
-| `timeoutMs` | `2000` | shorter than the core's 5s default: the call sits inline in the pre-step waterfall |
+| `triggers` | `['/dispatch', '/jev']` | trigger words; they outrank the keyword gate in every mode |
+| `autoKeywords` | bilingual task-verb dictionary (see Usage) | the local gate dictionary for `auto`: Chinese matches as a substring, ASCII on word boundaries (`fix` misses `prefix`), case-insensitive; consulted under `auto` only |
+| `timeoutMs` | `5000` | total deadline for one jev call (ms). The call sits inline in the pre-step waterfall, so this is **the worst-case extra milliseconds one turn can wait**; on timeout it fails open, the turn proceeds, there is just no advice |
 | `stateChars` | `1200` | state cap |
 | `model` | `null` | jev model id; `null` uses the core's pinned version |
 | `thresholds` | see above | each of the six gates is independently overridable |
@@ -151,7 +174,7 @@ The other leg — who needs attention while a subagent runs — lives in **dsh-t
 
 **Sent `/dispatch` and saw no advice?** Check the verdict log (`logDir`) — most likely a well-reasoned skip: the task is too small ("do it here"), the turn already names an agent ("advice adds nothing"), or confidence fell short. **When it judges correctly, it looks like nothing happened.** Use `/jev` to see the reasoning: skip verdicts are rendered too.
 
-**Usable without a jev key?** Installable and harmless (zero load on the host), but the advice stays silent — there is deliberately NO local-rules fallback here, because a wrong recommendation is worse than silence. For a local, zero-dependency ranking boost see dsh-tui-pi 2.24+'s attention (heuristic always on, jev only an upgrade layer).
+**Usable without a jev key?** Installable and harmless (zero load on the host), but the advice stays silent — there is deliberately NO local-rules fallback here, because a wrong recommendation is worse than silence. `auto`'s local keyword gate is not a fallback recommendation: it only decides whether a turn is worth asking Jev about, produces no advice of its own, and with no key the plugin is silent all the same. For a local, zero-dependency ranking boost see dsh-tui-pi 2.24+'s attention (heuristic always on, jev only an upgrade layer).
 
 **How does this relate to dsh-tui-pi's attention?** Complementary legs: this plugin covers BEFORE dispatching (whether/whom); attention covers AFTER (who is stuck, when to stop early). Both work in the same turn without knowing about each other.
 

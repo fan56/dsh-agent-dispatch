@@ -19,6 +19,9 @@ test('defaults ship off, silent, and unlogged', () => {
   assert.deepEqual(config.triggers, ['/dispatch', '/jev'])
   assert.equal(config.toolName, 'use_agent')
   assert.equal(config.provider, 'spawn')
+  // The README claimed 2000 for three releases after the code moved to 5000;
+  // this assertion is what makes that drift impossible to repeat silently.
+  assert.equal(config.timeoutMs, 5_000)
 })
 
 test('thresholds are the System One calibration values, each independently overridable', () => {
@@ -53,8 +56,30 @@ test('a config with no thresholds object still gets the full set', () => {
   assert.deepEqual(config.thresholds, { ...DEFAULT_THRESHOLDS })
 })
 
-test('validation rejects an unknown mode', () => {
-  assert.throws(() => resolveConfig({ mode: 'auto' }), /mode must be one of off, once/)
+test('validation accepts auto and still rejects an unknown mode', () => {
+  assert.equal(resolveConfig({ mode: 'auto' }).mode, 'auto')
+  // The anchored "$" is load-bearing: an unanchored /off, once/ keeps matching
+  // the new "off, once, auto" message, so a prefix match here is a false green.
+  assert.throws(() => resolveConfig({ mode: 'sometimes' }), /mode must be one of off, once, auto$/)
+})
+
+test('autoKeywords default to the shipped bilingual dictionary, non-empty by construction', () => {
+  const config = resolveConfig()
+  assert.ok(Array.isArray(config.autoKeywords))
+  assert.ok(config.autoKeywords.length > 0)
+  // every shipped entry is non-empty, and the dictionary is task intent, never single characters
+  assert.ok(config.autoKeywords.every((keyword) => typeof keyword === 'string' && keyword.length > 1))
+  assert.ok(config.autoKeywords.includes('修复'))
+  assert.ok(config.autoKeywords.includes('fix'))
+  assert.ok(config.autoKeywords.includes('help me'))
+})
+
+test('auto mode refuses an empty keyword gate — a mode that could never fire', () => {
+  assert.throws(() => resolveConfig({ mode: 'auto', autoKeywords: [] }), /mode "auto" requires a non-empty autoKeywords/)
+  // the same list is inert outside auto, so it is not an error there
+  assert.deepEqual(resolveConfig({ mode: 'once', autoKeywords: [] }).autoKeywords, [])
+  assert.throws(() => resolveConfig({ autoKeywords: 'fix' }), /autoKeywords must be an array of non-empty strings/)
+  assert.throws(() => resolveConfig({ autoKeywords: ['ok', ''] }), /autoKeywords must be an array of non-empty strings/)
 })
 
 test('validation rejects triggers that are not slash commands', () => {

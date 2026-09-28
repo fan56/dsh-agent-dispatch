@@ -7,9 +7,16 @@
 #
 # The plugin owns no delegation machinery: `use_agent` (dsh-subagent-registry)
 # does the spawning, and the capability gate probes its live visibility at
-# request time. It ships OFF (`mode: off`): switch a profile to `once` to get
-# verdict-on-request via `/dispatch` or `/jev`, and enable a jev key
-# (keychain-first, see README) or the plugin stays silent.
+# request time. It ships OFF (`mode: off`, no listener, zero calls, zero data
+# shared): switch a profile to `once` for verdict-on-request via `/dispatch` or
+# `/jev`, or to `auto` to ALSO cover ordinary turns — `auto` runs a purely local
+# keyword gate first (string matching against `autoKeywords`, no network, no
+# clock) and only a turn that hits a keyword is worth a jev call; a turn that
+# hits nothing stays completely silent (no call, no injection, no log line).
+# `auto` needs a non-empty `autoKeywords` (an empty gate can never fire and is
+# rejected at load) and really wants a `logDir`, the only place a keyword hit's
+# cost becomes visible. Enable a jev key (keychain-first, see README) either
+# way, or the plugin stays silent.
 
 - insert:
     - id: dsh-agent-dispatch

@@ -4,6 +4,45 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- feat: `mode: 'auto'` — the local keyword gate. Every ordinary user turn is
+  matched against the new `autoKeywords` list first, IN PROCESS (plain string
+  matching, no network, no clock, no state), and only a hit earns one jev
+  verdict. A turn that hits nothing is returned untouched and completely
+  silent: no call, no injection, no log line, no data shared. That gate — not
+  "ask jev about every turn" — is the whole difference the mode adds. Explicit
+  `/dispatch` and `/jev` triggers are matched first, are never gated, and keep
+  their semantics in every mode (a capability gap still answers with a
+  diagnostic, a `/jev` skip is still rendered).
+- `autoKeywords` defaults to a 54-entry bilingual task-verb dictionary: 29
+  Chinese phrases matched as substrings (Chinese has no word boundaries; single
+  characters like 写/改/加 are deliberately absent, they appear in small talk)
+  and 25 ASCII words matched on word boundaries (so `fix` misses `prefix` and
+  `add` misses `address`), both case-insensitively. The list is replaceable as
+  a whole. `mode: 'auto'` with an EMPTY list is a load error: a gate that looks
+  on and can never fire is exactly the silent mismatch this plugin refuses —
+  `once` is the mode for explicit requests only.
+- `auto` without `logDir` logs one extra boot info line. The gate's misses are
+  invisible by design, so the verdict log is the only channel that says which
+  keywords earn their call.
+- Keyword-hit turns record `trigger` as `"kw:<keyword>"` in the verdict log
+  (explicit turns still record the trigger word itself) — the label that makes
+  the gate calibratable. A keyword-hit turn that jev skips still renders
+  nothing and logs no `skip —` info line, and a failed capability gate stays
+  silent for it too: it never asked for a verdict, so a gap in the subagent
+  stack is not its business. No new threshold keys — the worst-case added
+  latency is still bounded by the existing `timeoutMs` (default 5000).
+- docs: the package's `cordis.patch.yml` comment now describes both `once` and
+  `auto` (local gate semantics included); `config: {}` stays empty.
+- docs: README (zh/en) — third mode documented in Usage, `autoKeywords` row
+  added and the `mode` row rewritten in both config tables, Privacy now states
+  that `auto` only sends a turn that cleared the local gate (the gate itself is
+  zero-network), verdict-log section documents the `kw:` label. This supersedes
+  the 0.1.0 note that `auto` was deliberately out of scope — it lands now,
+  gated locally instead of classifying every turn.
+- docs: the `timeoutMs` config row still said `2000` and justified it as
+  "shorter than the core's 5s default"; the default has been 5000 since 0.1.1,
+  so the row and the argument built on it now match the code.
+
 ## 0.1.3 - 2026-09-28
 
 - fix: `scripts/smoke-boot.mjs` still hardcoded the pre-rename plugin id

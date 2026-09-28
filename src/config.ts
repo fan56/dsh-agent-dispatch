@@ -29,11 +29,23 @@ export const PLUGIN_SOURCE_KIND = `plugin:${PLUGIN_NAME}`
  * - `once` registers the pre-step listener but classifies ONLY turns that
  *   explicitly ask for a verdict (`/dispatch <task>` or `/jev <question>`):
  *   one call per request, predictable cost and data sharing.
+ * - `auto` registers the same listener and puts a LOCAL keyword gate in front
+ *   of it: every ordinary user turn is matched against `autoKeywords` in
+ *   process (string matching, no network, no clock), and only a turn that hits
+ *   a keyword is worth a jev call. A turn that hits nothing is left untouched
+ *   and completely silent — no call, no injection, no log line. This is the
+ *   difference between `auto` and "ask jev about every turn", and it is the
+ *   whole point of the mode.
  *
- * `auto` (classify every plain user turn) is deliberately absent: the map
- * parks it in fog until the `once` verdict log has earned it.
+ * `auto` requires a non-empty `autoKeywords`: an empty list would be a mode
+ * that looks on and can never fire, which is exactly the silent mismatch this
+ * plugin refuses. `mode: once` is the way to say "explicit requests only".
+ *
+ * Explicit triggers keep their semantics in every mode: they are matched
+ * first, they are never gated by keywords, and their verdicts are rendered
+ * (a `/jev` skip is shown) and diagnosed (a capability gap names itself).
  */
-export type DispatchMode = 'off' | 'once'
+export type DispatchMode = 'off' | 'once' | 'auto'
 
 /**
  * The System One calibration values from the dispatch rubric decision:
@@ -59,6 +71,31 @@ export const DEFAULT_THRESHOLDS = {
 
 export type Thresholds = { -readonly [K in keyof typeof DEFAULT_THRESHOLDS]: number }
 
+/**
+ * The default `auto` gate dictionary: intent-carrying task verbs and phrases,
+ * Chinese and English. Consulted only by `mode: 'auto'`.
+ *
+ * Two rules shaped this list. Chinese entries are PHRASES, never single
+ * characters: 写/改/加/删 all appear inside ordinary chat, so a one-character
+ * keyword would fire the gate on small talk — the one failure mode a gate has
+ * to avoid. English entries are word-bounded at match time, so `fix` cannot
+ * fire on `prefix` and `add` cannot fire on `address`.
+ *
+ * The bias is deliberate: a missed keyword costs one jev call's advice, while a
+ * false hit costs a call on a turn nobody asked about. Add narrowly.
+ */
+export const DEFAULT_AUTO_KEYWORDS: readonly string[] = [
+  // Chinese / non-ASCII: substring-matched (Chinese has no word boundaries).
+  '帮我', '请帮', '麻烦', '实现', '修复', '排查', '调查', '调研', '研究', '分析',
+  '优化', '重构', '部署', '发布', '测试', '迁移', '升级', '接入', '集成', '审查',
+  '评审', '复现', '定位', '验证', '写一个', '改一下', '加一个', '跑一下', '为什么',
+  // ASCII: word-bounded, case-insensitive.
+  'implement', 'fix', 'refactor', 'investigate', 'research', 'analyze', 'analyse',
+  'optimize', 'optimise', 'deploy', 'test', 'write', 'add', 'remove', 'replace',
+  'migrate', 'upgrade', 'review', 'debug', 'reproduce', 'verify', 'diagnose',
+  'help me', 'can you', 'write a',
+]
+
 export interface DispatchConfig {
   mode: DispatchMode
   /**
@@ -74,6 +111,16 @@ export interface DispatchConfig {
   provider: string
   /** Turn triggers parsed from the user's own text; each must start with `/`. */
   triggers: string[]
+  /**
+   * The local gate dictionary for `mode: 'auto'`, and ONLY for it: an ordinary
+   * user turn is classified only when its text hits one of these. Chinese /
+   * non-ASCII entries match as substrings, ASCII entries match on word
+   * boundaries, both case-insensitively. Never consulted by `off` or `once`.
+   *
+   * Must be non-empty in `auto` mode — an empty gate is a mode that can never
+   * fire, which validates as an error rather than shipping a silent no-op.
+   */
+  autoKeywords: readonly string[]
   /**
    * Total deadline for one jev call, in ms. Real-machine verdicts
    * (2026-09-28, typesafe native) measured cold-start spikes well past 2s,
@@ -104,6 +151,7 @@ export function defaults(): DispatchConfig {
     toolName: 'use_agent',
     provider: 'spawn',
     triggers: ['/dispatch', '/jev'],
+    autoKeywords: [...DEFAULT_AUTO_KEYWORDS],
     timeoutMs: 5_000,
     stateChars: 1_200,
     model: null,
@@ -133,7 +181,7 @@ export function mergeDefaults<T>(defaultsValue: T, input: unknown): T {
   return out as T
 }
 
-const MODES: readonly DispatchMode[] = ['off', 'once']
+const MODES: readonly DispatchMode[] = ['off', 'once', 'auto']
 
 /**
  * Validate a merged configuration. Throws with a human message on the first
@@ -159,6 +207,17 @@ export function validate(config: DispatchConfig): DispatchConfig {
   if (!Array.isArray(config.triggers) || config.triggers.length === 0
     || !config.triggers.every((trigger) => typeof trigger === 'string' && trigger.startsWith('/'))) {
     throw new Error(`${where}: triggers must be a non-empty array of "/command" strings`)
+  }
+  if (!Array.isArray(config.autoKeywords)
+    || !config.autoKeywords.every((keyword) => typeof keyword === 'string' && keyword.trim() !== '')) {
+    throw new Error(`${where}: autoKeywords must be an array of non-empty strings`)
+  }
+  if (config.mode === 'auto' && config.autoKeywords.length === 0) {
+    // An empty gate is a mode that looks on and can never fire: every turn
+    // would be quiet forever, which is indistinguishable from a broken install.
+    // Refusing to mount is the only honest answer; `once` is the mode the user
+    // actually meant.
+    throw new Error(`${where}: mode "auto" requires a non-empty autoKeywords list, because an empty gate can never fire; use mode "once" to classify explicit requests only`)
   }
   if (!Number.isFinite(config.timeoutMs) || config.timeoutMs < 50) {
     throw new Error(`${where}: timeoutMs must be a number >= 50`)
