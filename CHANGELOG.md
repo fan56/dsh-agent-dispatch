@@ -4,12 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
-## 0.1.1 (as @aiwayds/dsh-agent-dispatch) - 2026-09-28
+## 0.1.2 - 2026-09-28
 
-Renamed from `@aiwayds/dsh-jev-dispatch` (same code as that package's
-0.1.1): the old name said HOW (jev), the new name says WHAT (agent
-dispatch advice) and matches the ecosystem's functional naming
-(dsh-ask-router, dsh-subagent-registry, dsh-approval-policy, ...).
+First release as `@aiwayds/dsh-agent-dispatch` (renamed from
+`@aiwayds/dsh-jev-dispatch`, same code as that package's 0.1.1): the old
+name said HOW (jev), the new name says WHAT (agent dispatch advice) and
+matches the ecosystem's functional naming (dsh-ask-router,
+dsh-subagent-registry, dsh-approval-policy, ...).
 
 ## 0.1.1 - 2026-09-28
 
@@ -18,7 +19,6 @@ dispatch advice) and matches the ecosystem's functional naming
   pre-step waterfall but fails open either way, and a cold call now lands
   instead of silently timing out. The key was already configurable.
 
-## 0.1.0 - 2026-09-28
 ## 0.1.0 - 2026-09-28
 
 First release — the ex-ante dispatch leg of the dsh jev effort. Scope per the
