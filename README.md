@@ -24,14 +24,21 @@ npm install @aiwayds/dsh-jev-dispatch
 
 peer 依赖 `@deepseek-ai/dsh >= 0.1.7-rc.1`，需要 `@aiwayds/dsh-jev-core`（自动装）。ESM，Node ≥ 22。
 
-装到 profile（`dsh plugin add @aiwayds/dsh-jev-dispatch`）或直接在 `cordis.patch.yml` 里手写：
+装到 profile（`dsh plugin add @aiwayds/dsh-jev-dispatch`），**然后把包名加进 profile 的 bundle 列表**——这是 `plugin add` 不会替你做的一步（实测 2026-09-28：`plugin --profile tui list` 会显示已安装，但宿主 loader 只挂载 `dsh.profile.bundles` 里列出的包，漏了这一步插件永远静默不生效）。编辑 `<profile>/package.json`：
+
+```json
+{
+  "dsh": { "profile": { "bundles": [ "...", "@aiwayds/dsh-jev-dispatch" ] } }
+}
+```
+
+再在 `cordis.patch.yml` 里配置（id-targeted override，见包内默认 patch 的 `id: dsh-jev-dispatch`）：
 
 ```yaml
-- insert:
-    - id: dsh-jev-dispatch
-      name: '@aiwayds/dsh-jev-dispatch'
-      config:
-        mode: once
+- id: dsh-jev-dispatch
+  name: '@aiwayds/dsh-jev-dispatch'
+  config:
+    mode: once
 ```
 
 ## 配置 jev key（keychain 优先，零明文）
