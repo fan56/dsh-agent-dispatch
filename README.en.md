@@ -145,6 +145,20 @@ What leaves the machine: the turn's **plain user text only** (plugin- and tool-a
 
 The other leg — who needs attention while a subagent runs — lives in **dsh-tui-pi's attention** and shares `@aiwayds/dsh-jev-core` with this plugin: one key resolution, one strict validation, one fail-open contract. Attention upgrades to semantic scoring with jev and falls back to a local heuristic ranking without it; dispatch goes silent without it.
 
+## FAQ
+
+**Installed but nothing happens?** Check three layers in order: (1) is the package in `dsh.profile.bundles`? `plugin add` does NOT write it for you (see Install) — without the entry the loader never mounts the plugin; (2) is `mode` still the default `off`? (3) is a jev key configured? No key = complete silence (one boot info line). Any of the three failing looks identical: nothing happens. That's by design, not a bug.
+
+**Sent `/dispatch` and saw no advice?** Check the verdict log (`logDir`) — most likely a well-reasoned skip: the task is too small ("do it here"), the turn already names an agent ("advice adds nothing"), or confidence fell short. **When it judges correctly, it looks like nothing happened.** Use `/jev` to see the reasoning: skip verdicts are rendered too.
+
+**Usable without a jev key?** Installable and harmless (zero load on the host), but the advice stays silent — there is deliberately NO local-rules fallback here, because a wrong recommendation is worse than silence. For a local, zero-dependency ranking boost see dsh-tui-pi 2.24+'s attention (heuristic always on, jev only an upgrade layer).
+
+**How does this relate to dsh-tui-pi's attention?** Complementary legs: this plugin covers BEFORE dispatching (whether/whom); attention covers AFTER (who is stuck, when to stop early). Both work in the same turn without knowing about each other.
+
+**Difference from the community's dsh-jev-subagent-dispatch?** That one routes to MODEL tiers (provider/model pairs); this one routes to REGISTERED AGENTS (~/.dsh/agents/*.md, native to use_agent and the roster). That one reads keys from env; this one is keychain-first. Both can be installed together (custom `triggers` avoid collisions).
+
+**How do I calibrate the thresholds?** No preview dry-run; use `/jev` plus the verdict log — every record carries the four raw answers and the final action. Read skips against advises until the misses disappear. All thresholds hot-apply.
+
 ## Development
 
 ```sh

@@ -145,6 +145,20 @@ jq -r 'select(.action=="advise") | [.route, .confidence] | @tsv' verdicts.ndjson
 
 事后那条腿（子代理跑着的时候谁需要干预）在 **dsh-tui-pi 的 attention** 里，与本插件共用 `@aiwayds/dsh-jev-core`：两腿共享 key 解析、严格校验与 fail-open 契约，attention 有 jev 用语义打分、没有就退回本地启发式排序，本插件没有 jev 就沉默。
 
+## 常见问题
+
+**装了没反应？** 按顺序查三层：①`dsh.profile.bundles` 列表里有没有本包（`plugin add` 不会替你写，见安装节——这一步漏了插件根本不挂载）；②`mode` 是不是还是默认 `off`；③jev key 配了没有（没 key = 完全静默，一条 boot info 而已）。三者任一不满足，表现都是"什么都没发生"，这是设计不是 bug。
+
+**发了 `/dispatch` 但没看到建议？** 先看 verdict log（配了 `logDir` 的话）——大概率是判了 skip 且理由合理：任务太小（"主代理自己做"）、turn 里已经点名了 agent（"建议无增益"）、置信度不够。**它判断得对的时候，看起来就像什么都没发生**。想看到判定过程用 `/jev`：skip 的结论也会渲染出来。
+
+**没配 jev key 能用吗？** 能装能用（宿主零负担），但建议功能静默——本插件没有"本地规则兜底建议"，因为错误建议比沉默更糟（这是和启发式路由器的根本分歧）。要本地零依赖的排序增强，看 dsh-tui-pi 2.24+ 的 attention（启发式常开，jev 只是升级层）。
+
+**和 dsh-tui-pi 的 attention 什么关系？** 互补的两条腿：本插件管**派活之前**（该不该派、派给谁）；attention 管**派活之后**（谁卡了、该不该提前停）。一个 turn 里两个都会工作，互不知道对方存在也不需要知道。
+
+**和社区的 dsh-jev-subagent-dispatch 区别？** 它路由到模型档位（provider/model 对），本插件路由到**注册 agent**（`~/.dsh/agents/*.md`，与 `use_agent`/roster 原生联动）；它 key 走环境变量，本插件 keychain 优先零明文；两者可同装（触发词不同会撞，改 `triggers` 即可）。
+
+**怎么校准阈值？** `/route preview` 风格的干跑没有；用 `/jev` + verdict log：log 里每条记录带四题原始答案和最终 action，skip 的 case 和 advise 的 case 对照着看，调 `thresholds` 直到 miss 消失。配置里的阈值全部热生效。
+
 ## 开发
 
 ```sh
