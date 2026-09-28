@@ -1,0 +1,65 @@
+{
+  "name": "@aiwayds/dsh-jev-dispatch",
+  "version": "0.1.0",
+  "description": "dsh plugin: Jev-guided dispatch advice — before a turn starts, a TypeSafe Jev call decides whether the task belongs to a registered agent and which one, then injects a four-line, ignore-if-unsuited recommendation. Jev-optional: no key means silence.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "jev",
+    "typesafe",
+    "subagent",
+    "dispatch",
+    "agent"
+  ],
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "icon": "./icon.svg",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.1.7-rc.1"
+  },
+  "dependencies": {
+    "@aiwayds/dsh-jev-core": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "files": [
+    "lib",
+    "scripts",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "README.en.md"
+  ],
+  "scripts": {
+    "link-closure": "node scripts/link-dsh-closure.mjs",
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "precheck": "node scripts/link-dsh-closure.mjs",
+    "pretest": "npm run build",
+    "test": "node --test test/*.test.mjs",
+    "smoke": "node scripts/smoke-boot.mjs"
+  },
+  "author": "fan56",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fan56/dsh-jev-dispatch.git"
+  },
+  "homepage": "https://github.com/fan56/dsh-jev-dispatch",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}
