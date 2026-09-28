@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { NO_AGENT, QUESTION_IDS, agentOptions, buildQuestions, criteriaLines, findTrigger, parseAgentMarkdown, resolvePick } from '../lib/index.js'
+import { NO_AGENT, QUESTION_IDS, agentOptions, buildQuestions, criteriaLines, findKeyword, findTrigger, parseAgentMarkdown, resolvePick } from '../lib/index.js'
 import { agentFile, pluginInjected, userMessage } from './helpers.mjs'
 
 /** A roster snapshot in the shape the rubric reads it. */
@@ -118,4 +118,85 @@ test('the rubric never asks for effort, blast radius, or a model', () => {
   assert.ok(!body.includes('effort'))
   assert.ok(!body.includes('blast_radius'))
   assert.ok(!body.includes('"model"'))
+})
+
+// ------------------------------------------------ the local auto keyword gate
+
+/**
+ * One row per gate decision: [what it pins, turn text, dictionary, expected
+ * hit]. The gate is the only thing standing between an ordinary turn and a jev
+ * call, so each row is a semantic claim about which turns are worth one.
+ */
+const KEYWORD_CASES = [
+  // Word boundaries: letters, digits, and underscore are word characters.
+  ['fix inside prefix is not a word', 'the prefix is unchanged', ['fix'], null],
+  ['add inside address is not a word', 'update the address field now', ['add'], null],
+  ['add inside addressing is not a word', 'addressing the flaky test', ['add'], null],
+  ['fix_it is one identifier, not a word', 'please fix_it now', ['fix'], null],
+  ['a hyphen separates words', 'please fix-me now', ['fix'], 'fix'],
+  ['a hyphen separates words in front of the keyword', 'the e2e-test is red', ['test'], 'test'],
+  ['punctuation separates words', 'fix, then ship it', ['fix'], 'fix'],
+  // One common inflection is allowed after an ASCII stem.
+  ['fixing is the same verb as fix', 'fixing the timer', ['fix'], 'fix'],
+  ['fixed is the same verb as fix', 'fixed the bug', ['fix'], 'fix'],
+  ['tests is the same noun as test', 'run the tests', ['test'], 'test'],
+  ['deployment is the same noun as deploy', 'deployment is broken', ['deploy'], 'deploy'],
+  ['refactoring is the same verb as refactor', 'refactoring the auth module', ['refactor'], 'refactor'],
+  ['analysis is shipped as its own entry', 'analysis is wrong', ['analysis'], 'analysis'],
+  // CJK next to Latin: a Chinese entry matches as a substring, even glued to a word.
+  ['a Chinese keyword matches with Latin right after it', '帮我fix一下', ['帮我'], '帮我'],
+  ['the Chinese entry wins on dictionary order, not on the ASCII path', '帮我fix一下', ['帮我', 'fix'], '帮我'],
+  // Whitespace folding and NFKC apply to the matching copy only.
+  ['repeated spaces fold to one', 'help  me please', ['help me'], 'help me'],
+  ['a newline folds to a space', 'help\nme please', ['help me'], 'help me'],
+  // A multi-word entry treats punctuation between its words as a separator.
+  ['a comma separates the words of an entry', 'help,me please', ['help me'], 'help me'],
+  ['a hyphen separates the words of an entry', 'help-me please', ['help me'], 'help me'],
+  ['the letters of one word are not a separator', 'helpXme please', ['help me'], null],
+  ['full-width Latin folds to ASCII', 'ｆｉｘ this bug', ['fix'], 'fix'],
+  ['a full-width space folds like any other', 'ｆｉｘ　this bug', ['fix'], 'fix'],
+  // User config may be regex-shaped; it must be escaped, never compiled.
+  ['a regex-shaped keyword is escaped', 'a label (b) here', ['(b)'], '(b)'],
+  ['an anchored-looking keyword is escaped', 'it costs $5+ now', ['$5+'], '$5+'],
+  ['the same keyword does not hit a different amount', 'it costs $5 now', ['$5+'], null],
+  ['a multi-word keyword is matched as one phrase', 'x a b y', ['a b'], 'a b'],
+]
+
+test('the keyword gate table: boundaries, inflections, folding, escapes', () => {
+  for (const [name, text, keywords, expected] of KEYWORD_CASES) {
+    const hit = findKeyword([userMessage(text)], keywords)
+    assert.equal(hit === null ? null : hit.keyword, expected, name)
+  }
+})
+
+test('the gate keeps message order ahead of dictionary order (first hit wins)', () => {
+  // The dictionary is deliberately in the opposite order: a dictionary-first
+  // scan would answer "deploy" for a turn whose FIRST message says "fix".
+  const messages = [userMessage('please fix the timer'), userMessage('then deploy it')]
+  assert.deepEqual(findKeyword(messages, ['deploy', 'fix']), { keyword: 'fix' })
+  // Within ONE message the dictionary decides.
+  assert.deepEqual(findKeyword([userMessage('fix and deploy it')], ['deploy', 'fix']), { keyword: 'deploy' })
+})
+
+test('the gate reads plain user text only, and skips malformed dictionary entries', () => {
+  assert.equal(findKeyword([pluginInjected('[dsh-agent-dispatch] suggest: workhorse — 部署 the fix')], ['部署', 'fix']), null)
+  assert.equal(findKeyword([userMessage('   ')], ['fix']), null)
+  assert.equal(findKeyword([], ['fix']), null)
+  assert.equal(findKeyword(null, ['fix']), null)
+  assert.deepEqual(findKeyword([userMessage('fix it')], [123, '', 'fix']), { keyword: 'fix' })
+})
+
+test('the gate never mutates the text it matched', () => {
+  const text = 'ｆｉｘ  the\nTimer  now'
+  const message = userMessage(text)
+  assert.deepEqual(findKeyword([message], ['fix']), { keyword: 'fix' })
+  assert.equal(message.content[0].text, text)
+})
+
+test('a Chinese substring hit inside a longer word is a known tradeoff, not a bug', () => {
+  // 修复面膜 ("repair mask") hits 修复 ("repair"): Chinese has no word
+  // boundaries, so substring matching is the only cheap rule available, and the
+  // alternative (segmenting) costs more than the occasional false hit. This test
+  // exists so the behavior is not "fixed" by accident later.
+  assert.deepEqual(findKeyword([userMessage('修复面膜怎么用')], ['修复']), { keyword: '修复' })
 })

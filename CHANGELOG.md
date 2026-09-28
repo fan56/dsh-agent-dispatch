@@ -42,6 +42,58 @@ All notable changes to this project are documented in this file.
 - docs: the `timeoutMs` config row still said `2000` and justified it as
   "shorter than the core's 5s default"; the default has been 5000 since 0.1.1,
   so the row and the argument built on it now match the code.
+- fix: the default `autoKeywords` dictionary was revised after real-machine
+  probing found a whole band of the most common task phrasings silent (false
+  negatives) while a couple of entries were far too broad. Added Chinese
+  修改/检查/删除/移除/去掉/报错/生成/梳理/提交/构建/安装/总结/对比/看一下/看看/为什么会;
+  removed 为什么 (subsumed by 为什么会) and split 麻烦 into 麻烦你 + 麻烦帮.
+  Added ASCII build/commit/check/explain/summarize/generate/delete/install/
+  update/run/document; removed `can you` (English politeness covers nearly every
+  sentence, so it was the highest false-positive entry); added the irregular
+  forms analysis/writing/debugging. Kept: every other entry, and the rule that a
+  single Chinese character never ships (写/改/加/删 fire on small talk). The
+  dictionary is now 45 Chinese + 38 ASCII = 83 entries. The widening is
+  deliberate and follows an ASYMMETRIC cost model: a false hit costs one jev
+  call that in all likelihood comes back `skip`, while a miss costs the turn the
+  whole feature — the user gets nothing and cannot tell a miss from a broken
+  install.
+- fix: ASCII gate matching was widened in three ways. One common inflection is
+  now allowed after a stem (`s`/`es`/`ed`/`ing`/`ment`/`ments`), so
+  `fixing`/`fixed`/`tests`/`deployment`/`refactoring` hit while `prefix`,
+  `address`, and `addressing` still miss; word boundaries are now built from
+  letters, digits, and underscore only, so a hyphen separates words (`fix-me`,
+  `the e2e-test is red`) while the identifier `fix_it` still does not match; and
+  matching runs on a folded copy of the turn — NFKC (a full-width `ｆｉｘ` hits
+  `fix`) with whitespace runs collapsed (so `help  me` and `help\nme` hit
+  `help me`). The state sent to jev and every log line still carry the user's
+  bytes unchanged.
+- fix: an `auto` keyword hit that runs into an incomplete subagent stack (wrong
+  `agentsDir`, empty roster, `use_agent` not visible, delegation depth spent) no
+  longer stays invisible for a whole session. The first such turn logs ONE info
+  line naming what is missing and stating that keyword-hit turns stay silent by
+  design; later hits do not repeat it. Nothing is injected and no verdict-log row
+  is written for those turns, exactly as before.
+- fix: the `kw:<keyword>` verdict-log label is cleaned before it is written —
+  CR/LF become spaces, whitespace collapses, and the label is capped at 64
+  characters — because the label is user configuration and a raw newline in it
+  made the NDJSON line unreadable as calibration evidence.
+- UPGRADE NOTE: `mode: 'auto'` was a validation ERROR in earlier versions; it is
+  supported now, so a profile that upgraded with `auto` parked in its config will
+  start classifying turns on the next boot. Add a `logDir` if you want the
+  calibration evidence, or set the mode back to `once` deliberately.
+- docs: README (zh/en) — the default dictionary list is updated on both sides
+  (word for word, in order) and followed by the four matching rules (ASCII
+  suffix, hyphen as a separator, whitespace folding, NFKC); the capability-gate
+  section now states the one-time info line instead of claiming total silence;
+  Privacy says plainly that under `auto` a hit is sent even when the user never
+  typed `/dispatch`; the `timeoutMs` row no longer calls itself the worst-case
+  per-turn wait (it bounds the jev call, and a hit turn also pays the roster
+  read, the redaction pass, and the render); `README.en.md`'s `mode` row said
+  `warns at boot` where the code logs an info line, which this repo's own
+  no-warning rule makes wrong. A test now parses both READMEs' dictionary lists
+  and fails if either drifts from the code.
+- docs: `cordis.patch.yml`'s comment describes the one-time gap line and the
+  widened matching rules; `config: {}` stays empty.
 
 ## 0.1.3 - 2026-09-28
 

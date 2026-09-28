@@ -15,8 +15,12 @@
 # hits nothing stays completely silent (no call, no injection, no log line).
 # `auto` needs a non-empty `autoKeywords` (an empty gate can never fire and is
 # rejected at load) and really wants a `logDir`, the only place a keyword hit's
-# cost becomes visible. Enable a jev key (keychain-first, see README) either
-# way, or the plugin stays silent.
+# cost becomes visible. ASCII entries take one common inflection and treat a
+# hyphen as a word separator; matching runs on an NFKC-folded, whitespace-folded
+# COPY of the turn (the state sent to jev keeps the user's bytes). A hit that
+# runs into an incomplete subagent stack stays silent, except for ONE info line
+# the first time it happens in a session. Enable a jev key (keychain-first, see
+# README) either way, or the plugin stays silent.
 
 - insert:
     - id: dsh-agent-dispatch

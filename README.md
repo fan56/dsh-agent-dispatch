@@ -75,11 +75,18 @@ security add-generic-password -s typesafe.ai -a "$USER" -w
 `autoKeywords` 默认词典（可整套替换）：
 
 - 中文 / 非 ASCII（**子串**命中，中文没有词边界）：
-  `帮我` `请帮` `麻烦` `实现` `修复` `排查` `调查` `调研` `研究` `分析` `优化` `重构` `部署` `发布` `测试` `迁移` `升级` `接入` `集成` `审查` `评审` `复现` `定位` `验证` `写一个` `改一下` `加一个` `跑一下` `为什么`
-- ASCII（**词边界**命中，不分大小写）：
-  `implement` `fix` `refactor` `investigate` `research` `analyze` `analyse` `optimize` `optimise` `deploy` `test` `write` `add` `remove` `replace` `migrate` `upgrade` `review` `debug` `reproduce` `verify` `diagnose` `help me` `can you` `write a`
+  `帮我` `请帮` `麻烦你` `麻烦帮` `实现` `修复` `排查` `调查` `调研` `研究` `分析` `优化` `重构` `部署` `发布` `测试` `迁移` `升级` `接入` `集成` `审查` `评审` `复现` `定位` `验证` `写一个` `改一下` `加一个` `跑一下` `修改` `检查` `删除` `移除` `去掉` `报错` `生成` `梳理` `提交` `构建` `安装` `总结` `对比` `看一下` `看看` `为什么会`
+- ASCII（**词边界**命中，不分大小写，允许跟一个常见后缀）：
+  `implement` `fix` `refactor` `investigate` `research` `analyze` `analyse` `optimize` `optimise` `deploy` `test` `write` `add` `remove` `replace` `migrate` `upgrade` `review` `debug` `reproduce` `verify` `diagnose` `help me` `write a` `build` `commit` `check` `explain` `summarize` `generate` `delete` `install` `update` `run` `document` `analysis` `writing` `debugging`
 
-中文刻意不收单字——`写`/`改`/`加`/`删` 在闲聊里到处都是，一个单字闸门会把日常对话全打中。取舍偏保守：漏一个词只是少一次建议，误命中是替一个没人问过的回合付一次调用。
+中文刻意不收单字——`写`/`改`/`加`/`删` 在闲聊里到处都是，一个单字闸门会把日常对话全打中。取舍是**不对称**的、并且刻意放宽：误命中的代价是一次 jev 调用（而且多半判 skip），漏判的代价是这个回合整个功能不存在——用户还分不清"没命中"和"装坏了"，所以 `修改`/`检查`/`生成`/`build`/`commit`/`run` 这类最高频的派活表达必须收进来。
+
+匹配的四条规矩（都只作用于**用于匹配的副本**，发给 jev 的 state 与 verdict log 里仍是用户原文逐字节不动）：
+
+- **ASCII 允许一个常见后缀** `s`/`es`/`ed`/`ing`/`ment`/`ments`：`fixing`/`fixed`/`tests`/`deployment`/`refactoring` 都命中；`prefix`（`pre`+`fix` 后面是 `r`）、`address`、`addressing` 仍然不命中。屈变规则够不到的形态（`writing`、`debugging`、`analysis`）作为词条单独列出。
+- **连字符算词分隔符**（词字符只有字母、数字、下划线）：`fix-me`、`the e2e-test is red` 命中；`fix_it` 这种标识符内部不命中。
+- **空白折叠**：匹配前把空白串折成单个空格，`help  me`、`help\nme` 都命中 `help me`；多词词条（`help me`、`write a`）内部的空白按「非字母数字下划线」类的分隔符处理（标点也算），所以 `help,me`、`help-me` 一样命中，而 `helpXme`、`help_me` 不命中。
+- **NFKC 归一**：全角 `ｆｉｘ this bug`（中文输入法没切英文）命中 `fix`。
 
 一次请求四道原子题：
 
@@ -113,7 +120,7 @@ security add-generic-password -s typesafe.ai -a "$USER" -w
 3. roster 非空（没 agent 可派比不派更糟）
 4. 还有委派深度：会话 depth + 1 ≤ 宿主上限
 
-任一不满足：显式请求拿到一条诊断（缺什么、去哪查），**普通 turn 完全静默**、零调用、零日志——`auto` 下靠关键词闸门进来的 turn 同样完全静默（它没有主动要过判定，subagent 栈的缺口不是它的事），连 verdict log 都不记这行。深度那一项分两半：gate 里查的是与目标无关的必要条件，选定 agent 之后再按该 agent 的 `deep` 复核一次（`use_agent` 永远传显式 `maxDepth = childDepth + deep`，所以只有"会话深度 + 1 + agent.deep ≤ 宿主上限"才是真正会拒绝这次派发的算式）。
+任一不满足：显式请求拿到一条诊断（缺什么、去哪查），**普通 turn 完全静默**、零调用、零日志——`auto` 下靠关键词闸门进来的 turn 不注入、不记 verdict log（它没有主动要过判定，subagent 栈的缺口不是它的事），但**本会话第一次**遇到这种缺口会打**一行 info**，点名缺什么并说明关键词命中回合按设计保持静默；之后同进程不再重复，避免每回合刷屏。深度那一项分两半：gate 里查的是与目标无关的必要条件，选定 agent 之后再按该 agent 的 `deep` 复核一次（`use_agent` 永远传显式 `maxDepth = childDepth + deep`，所以只有"会话深度 + 1 + agent.deep ≤ 宿主上限"才是真正会拒绝这次派发的算式）。
 
 ## roster 从哪来
 
@@ -143,19 +150,19 @@ jq -r 'select(.action=="advise") | [.route, .confidence] | @tsv' verdicts.ndjson
 
 发出去的东西只有：本 turn 的**纯用户文本**（插件/工具产出的消息不进 state，本插件自己注入过的建议也不会被再次判定，图片等非文本内容一律不发）、工作目录路径、roster criteria。整段组装完成后统一脱敏再截断到 `stateChars`（默认 1200），内建覆盖 `sk-`/`pk_`/`ghp_`/`github_pat_`/`AKIA`/`Bearer`/`api_key=`/长 base64，`redactPatterns` 可再加。
 
-**什么时候才会外发**：`off` 从不外发；`once` 只在显式 `/dispatch` `/jev` 的回合外发；`auto` 只在**本地关键词命中**的回合外发（外发内容与 `once` 完全相同，含 cwd）。**本地关键词闸门本身不产生任何网络请求**——未命中的回合就是一次纯本地字符串比较，连一行日志都不会留下。子代理会话、已 abort 的回合、capability gate 不满足的 `auto` 回合，也都不外发。
+**什么时候才会外发**：`off` 从不外发；`once` 只在显式 `/dispatch` `/jev` 的回合外发；`auto` 只在**本地关键词命中**的回合外发（外发内容与 `once` 完全相同，含 cwd）——也就是说 **`auto` 下命中即外发，哪怕这个回合用户根本没打 `/dispatch`**，用户的原文会作为 state 送到 TypeSafe Jev。**本地关键词闸门本身不产生任何网络请求**——未命中的回合就是一次纯本地字符串比较，连一行日志都不会留下。子代理会话、已 abort 的回合、capability gate 不满足的 `auto` 回合，也都不外发。
 
 ## 配置项
 
 | 键 | 默认 | 说明 |
 |---|---|---|
-| `mode` | `'off'` | `off` / `once` / `auto`。`auto` = 本地关键词闸门，命中才问 Jev，未命中完全静默；要求非空 `autoKeywords`，且未配 `logDir` 时 boot 会提醒无法校准 |
+| `mode` | `'off'` | `off` / `once` / `auto`。`auto` = 本地关键词闸门，命中才问 Jev，未命中完全静默；要求非空 `autoKeywords`，且未配 `logDir` 时 boot 会打一行 info 说明无法校准 |
 | `agentsDir` | `'~/.dsh/agents'` | 默认字面量按 dsh home 解析，`DSH_HOME` 照常生效 |
 | `toolName` | `'use_agent'` | gate 探的派发工具名 |
 | `provider` | `'spawn'` | gate 探的 subagent provider |
 | `triggers` | `['/dispatch', '/jev']` | 触发词表，任何 mode 下都优先于关键词闸门 |
-| `autoKeywords` | 中英双语任务动词词典（见用法节） | `auto` 的本地闸门词典；中文走子串、ASCII 走词边界（`fix` 不命中 `prefix`），不分大小写；只在 `auto` 下被咨询 |
-| `timeoutMs` | `5000` | 单次 jev 调用的总死线（ms）。调用就在 pre-step 水龙头上，所以这是**一个回合最坏会多等的毫秒数**；超时 fail-open 放行，turn 照常走，只是没有建议 |
+| `autoKeywords` | 中英双语任务动词词典（见用法节） | `auto` 的本地闸门词典；中文走子串、ASCII 走词边界（允许 `s`/`es`/`ed`/`ing`/`ment`/`ments` 一个后缀，`fix` 覆盖 `fixing` 但不命中 `prefix`），连字符算词分隔符，匹配前做 NFKC + 空白折叠（只作用于匹配副本），不分大小写；只在 `auto` 下被咨询 |
+| `timeoutMs` | `5000` | **单次 jev 调用**的死线（ms）。命中回合除了这次调用，还要叠加 roster 现读、脱敏组装、渲染注入这些开销——所以它不是"一个回合最坏会多等的毫秒数"，只是其中最大的一块；超时 fail-open 放行，turn 照常走，只是没有建议 |
 | `stateChars` | `1200` | state 上限 |
 | `model` | `null` | jev 模型 id，`null` 用 core 的钉版 |
 | `thresholds` | 见上表 | 六个闸各自可配 |

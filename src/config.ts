@@ -81,19 +81,33 @@ export type Thresholds = { -readonly [K in keyof typeof DEFAULT_THRESHOLDS]: num
  * to avoid. English entries are word-bounded at match time, so `fix` cannot
  * fire on `prefix` and `add` cannot fire on `address`.
  *
- * The bias is deliberate: a missed keyword costs one jev call's advice, while a
- * false hit costs a call on a turn nobody asked about. Add narrowly.
+ * The list is deliberately WIDE, from an asymmetric cost model: a false hit
+ * costs one jev call that in all likelihood comes back `skip`, while a miss
+ * costs the mode itself — that turn gets no advice at all, and the user cannot
+ * tell a miss from a broken install. Real-machine probing found a whole band of
+ * the most common task phrasings (修改/检查/删除/生成, `build`/`commit`/`run`)
+ * silently absent, so they are in. Single Chinese characters stay out: that
+ * trade only goes one way, and a single character fires on small talk.
  */
 export const DEFAULT_AUTO_KEYWORDS: readonly string[] = [
   // Chinese / non-ASCII: substring-matched (Chinese has no word boundaries).
-  '帮我', '请帮', '麻烦', '实现', '修复', '排查', '调查', '调研', '研究', '分析',
-  '优化', '重构', '部署', '发布', '测试', '迁移', '升级', '接入', '集成', '审查',
-  '评审', '复现', '定位', '验证', '写一个', '改一下', '加一个', '跑一下', '为什么',
-  // ASCII: word-bounded, case-insensitive.
+  '帮我', '请帮', '麻烦你', '麻烦帮', '实现', '修复', '排查', '调查', '调研', '研究',
+  '分析', '优化', '重构', '部署', '发布', '测试', '迁移', '升级', '接入', '集成',
+  '审查', '评审', '复现', '定位', '验证', '写一个', '改一下', '加一个', '跑一下',
+  '修改', '检查', '删除', '移除', '去掉', '报错', '生成', '梳理', '提交', '构建',
+  '安装', '总结', '对比', '看一下', '看看', '为什么会',
+  // ASCII: word-bounded, case-insensitive, one common inflection allowed
+  // (`fixing`/`fixed`, `tests`, `deployment` — see `findKeyword`).
   'implement', 'fix', 'refactor', 'investigate', 'research', 'analyze', 'analyse',
   'optimize', 'optimise', 'deploy', 'test', 'write', 'add', 'remove', 'replace',
   'migrate', 'upgrade', 'review', 'debug', 'reproduce', 'verify', 'diagnose',
-  'help me', 'can you', 'write a',
+  'help me', 'write a',
+  'build', 'commit', 'check', 'explain', 'summarize', 'generate', 'delete',
+  'install', 'update', 'run', 'document',
+  // Irregular forms the suffix rule cannot reach (`write` never matches
+  // `writing`, `debug` never matches `debugging`, `analyze` never matches
+  // `analysis`).
+  'analysis', 'writing', 'debugging',
 ]
 
 export interface DispatchConfig {
@@ -115,7 +129,9 @@ export interface DispatchConfig {
    * The local gate dictionary for `mode: 'auto'`, and ONLY for it: an ordinary
    * user turn is classified only when its text hits one of these. Chinese /
    * non-ASCII entries match as substrings, ASCII entries match on word
-   * boundaries, both case-insensitively. Never consulted by `off` or `once`.
+   * boundaries (letting one common inflection through, so `fix` covers
+   * `fixing`/`fixed` but still misses `prefix`), both case-insensitively, on a
+   * whitespace-folded NFKC copy of the turn. Never consulted by `off`/`once`.
    *
    * Must be non-empty in `auto` mode — an empty gate is a mode that can never
    * fire, which validates as an error rather than shipping a silent no-op.

@@ -253,7 +253,35 @@ test('E: a keyword-turn verdict row is labelled kw:<keyword>', async () => {
   }
 })
 
-test('G: a capability gap on a keyword turn stays completely silent and unlogged', async () => {
+test('E2: a kw: label is one clean line — CR/LF folded, blanks collapsed, capped at 64 chars', async () => {
+  const jev = fakeJev({ dispatch: 0.85, agent: WORKHORSE })
+  const log = tempDir('dsh-agent-dispatch-auto-')
+  // A user-supplied keyword with a newline and a 70-char head: both the NDJSON
+  // line and the label have to survive it.
+  const messy = `${'x'.repeat(70)}\nsecond`
+  const { ctx, cleanup } = mount({
+    config: { autoKeywords: [messy], logDir: log.dir },
+    deps: { fetch: jev.fetchImpl },
+  })
+  try {
+    const typed = `${'x'.repeat(70)}  second`
+    await ctx.step({ agent: fakeAgent(), decision: ENTER([userMessage(typed)]) })
+    assert.equal(jev.calls.length, 1)
+    // a raw LF in the label would have split the row and broken the parse
+    const rows = await readVerdicts(log.file('verdicts.ndjson'))
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0].trigger, `kw:${'x'.repeat(64)}`)
+    assert.ok(!/[\r\n]/.test(rows[0].trigger))
+    assert.ok(rows[0].trigger.length <= 64 + 3)
+    // the gate matched a folded copy; what jev receives is the text as typed
+    assert.ok(jev.calls[0].body.state.includes(typed))
+  } finally {
+    cleanup()
+    log.cleanup()
+  }
+})
+
+test('G: a capability gap on a keyword turn says what is missing ONCE per session, then goes quiet', async () => {
   const jev = fakeJev({ dispatch: 0.9 })
   const log = tempDir('dsh-agent-dispatch-auto-')
   const { ctx, cleanup } = mount({
@@ -266,8 +294,19 @@ test('G: a capability gap on a keyword turn stays completely silent and unlogged
     assert.equal(out, decision)
     assert.equal(jev.calls.length, 0)
     assert.equal(ctx.deps.messageBuilder.injected.length, 0)
+    // the diagnostic an explicit turn would get is NOT injected here
     assert.equal(ctx.logs.info.filter((line) => /dispatch unavailable/.test(line)).length, 0)
-    assert.equal(ctx.logs.info.length, 0)
+    // ...but the gap itself is no longer invisible: one line, naming the gap
+    assert.equal(ctx.logs.info.length, 1)
+    assert.match(ctx.logs.info[0], /use_agent/)
+    assert.match(ctx.logs.info[0], /stay silent by design/)
+    assert.equal(ctx.logs.warn.length, 0)
+    // the second hit repeats nothing — the line is per session, not per turn
+    const second = ENTER([userMessage('再修复一次这个测试')])
+    const out2 = await ctx.step({ agent: fakeAgent(), decision: second })
+    assert.equal(out2, second)
+    assert.equal(jev.calls.length, 0)
+    assert.equal(ctx.logs.info.length, 1)
     assert.equal(ctx.logs.warn.length, 0)
     await assert.rejects(() => readVerdicts(log.file('verdicts.ndjson')), /ENOENT/)
   } finally {

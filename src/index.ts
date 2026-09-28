@@ -16,7 +16,10 @@
  * first and are never gated, so `/jev` and `/dispatch` keep their semantics
  * (rendered skip, capability diagnostic) in every mode. The gate's silent half
  * is also why `auto` wants a `logDir`: the verdict log is the only place the
- * cost of a keyword hit becomes visible.
+ * cost of a keyword hit becomes visible. The one thing `auto` adds back to the
+ * silence is a single `info` the first time a hit runs into an incomplete
+ * subagent stack — a gap that would otherwise make every hit a dead end, for a
+ * whole session, with no trace anywhere.
  *
  * The plugin owns no delegation machinery. It names an agent and the shape of
  * the `use_agent` call; `use_agent` (dsh-subagent-registry) does the spawning,
@@ -166,6 +169,7 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
     logger.info?.(`${PLUGIN_NAME}: mode auto without logDir — which autoKeywords hits are worth a jev call cannot be calibrated without the verdict log; set logDir to record them`)
   }
   let warnedNoFactory = false
+  let warnedAutoGap = false
 
   // prepend: this listener runs after the downstream listeners have produced
   // their decision, so it sees the final claimed batch and appends its
@@ -205,10 +209,19 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
       if (!capabilities.ok) {
         // An auto turn arrived here through the local gate and never asked for
         // a verdict, so a gap in the subagent stack is not its business: it
-        // stays completely silent — no diagnostic, no info line, no log row.
-        // Every explicit turn, by contrast, DID ask, so it gets the diagnostic
-        // naming exactly what is missing.
-        if (trigger === null) return decision as never
+        // injects nothing, writes no log row, and gets no diagnostic. But a gap
+        // that lasts the whole session is also exactly the "looks on, can never
+        // fire" mismatch this plugin refuses to ship silently — so the FIRST
+        // such turn says once, in one line, what is missing and that these
+        // turns stay quiet on purpose. Later hits do not repeat it: the hook is
+        // per mount, and a per-turn line would be the noise the design avoids.
+        if (trigger === null) {
+          if (!warnedAutoGap) {
+            warnedAutoGap = true
+            logger.info?.(`${PLUGIN_NAME}: mode auto cannot dispatch in this session — ${capabilities.missing.join('; ')}; keyword-hit turns stay silent by design (this line is logged once)`)
+          }
+          return decision as never
+        }
         const reason = capabilities.missing.join('; ')
         if (logDir !== null) {
           await appendVerdict(logDir, verdictRecord({
@@ -316,6 +329,24 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
 }
 
 /**
+ * The `kw:` label for a keyword hit. Keywords are user config, so one may carry
+ * CR/LF or a colon; the NDJSON row survives either (`JSON.stringify` escapes
+ * it), but a raw newline makes the line unreadable by eye and by `grep`, and an
+ * unreadable label is useless as calibration evidence. So: newlines become
+ * spaces, whitespace collapses, and the label is capped at 64 characters. A
+ * colon is left alone — it cannot break the row, and the label stays as close to
+ * the configured keyword as the format allows.
+ * @param keyword - the dictionary entry that matched, verbatim.
+ */
+function keywordLabel(keyword: string): string {
+  return keyword
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 64)
+}
+
+/**
  * Assemble one NDJSON row. Answers are kept whole: the log is the calibrator.
  * `trigger` is the explicit trigger word (`/dispatch`) or the local gate's
  * `kw:<keyword>` label for a keyword-hit auto turn — the log has to be able to
@@ -335,7 +366,7 @@ function verdictRecord(input: {
     id: verdictId(),
     session: input.agent?.session?.id ?? null,
     mode: input.config.mode,
-    trigger: input.trigger?.trigger ?? (input.keyword === null ? null : `kw:${input.keyword.keyword}`),
+    trigger: input.trigger?.trigger ?? (input.keyword === null ? null : `kw:${keywordLabel(input.keyword.keyword)}`),
     action: input.verdict.action,
     reason: input.verdict.reason,
     confidence: input.verdict.confidence,

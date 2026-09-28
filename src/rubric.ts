@@ -109,6 +109,54 @@ function isAsciiWord(keyword: string): boolean {
 }
 
 /**
+ * One common inflection is allowed right after a matched ASCII keyword, so a
+ * dictionary entry is the STEM and not one conjugation: `fixing`, `fixed`,
+ * `tests`, `deployment` all hit `fix`/`test`/`deploy`. `prefix`, `address` and
+ * `addressing` stay misses because the character after the stem is not one of
+ * these — the boundary check then rejects it.
+ */
+const ASCII_INFLECTION = '(?:s|es|ed|ing|ment|ments)'
+
+/**
+ * What counts as part of a word: letters, digits, underscore. Hyphens and
+ * punctuation are separators, so `fix-me` and `the e2e-test is red` match while
+ * the identifier `fix_it` does not.
+ */
+const WORD_CHAR = 'A-Za-z0-9_'
+
+/**
+ * What may stand between the words of a MULTI-word entry: a run of anything
+ * that is not a letter, a digit, or an underscore. Whitespace alone would make
+ * `help me` demand the user's own spacing, while `help,me` and `help-me` are
+ * the same request typed differently. `_` stays a word character, so the
+ * identifier `help_me` still misses. Needs the `u` flag (`\p{...}`).
+ */
+const WORD_SEPARATOR = '[^\\p{L}\\p{N}_]+'
+
+/**
+ * The regex body for one ASCII keyword. A single word stays literal (trailing
+ * space and all); a multi-word entry gets `WORD_SEPARATOR` between its words,
+ * each still escaped by `literal`, so `help me` / `help,me` / `help  me` /
+ * `help-me` are one entry while `helpXme` is not.
+ */
+function keywordBody(needle: string): string {
+  const words = needle.split(/\s+/).filter((word) => word.length > 0)
+  if (words.length < 2) return literal(needle)
+  return words.map((word) => literal(word)).join(WORD_SEPARATOR)
+}
+
+/**
+ * The copy of a text the gate matches against: NFKC-folded (so a full-width
+ * `ｆｉｘ` from an un-switched input method matches `fix`) with whitespace runs
+ * collapsed to one space (so `help  me` and `help\nme` match `help me`). This is
+ * a COPY — the caller's text, the state sent to jev, and every log line keep
+ * the user's bytes.
+ */
+function matchable(text: string): string {
+  return text.normalize('NFKC').replace(/\s+/g, ' ')
+}
+
+/**
  * The local gate for `mode: 'auto'`: does this turn even mention work?
  *
  * Zero network, zero clock, zero state — a deterministic string match over the
@@ -116,9 +164,12 @@ function isAsciiWord(keyword: string): boolean {
  * plugin's own injected advice can never re-arm the gate. The first hit wins
  * (message order, then dictionary order), matching `findTrigger`'s style.
  *
- * Matching is deliberately two-mode: ASCII keywords are word-bounded, so `fix`
- * misses `prefix` and `add` misses `address`; Chinese has no word boundaries,
- * so a substring IS a word there. Both sides are lowercased first.
+ * Matching is deliberately two-mode, on a folded copy of the text: ASCII
+ * keywords are word-bounded and take one common inflection, so `fix` misses
+ * `prefix` but covers `fixing`; Chinese has no word boundaries, so a substring
+ * IS a word there. Both sides are lowercased and folded first. Inside a
+ * multi-word entry the words are joined by `WORD_SEPARATOR`, so punctuation
+ * separates them just as whitespace does.
  * @param messages - the claimed messages for this step.
  * @param keywords - the `autoKeywords` dictionary (ignored when not `auto`).
  * @returns the hit keyword, or null when the turn stays local and silent.
@@ -129,16 +180,19 @@ export function findKeyword(
 ): KeywordHit | null {
   for (const message of messages ?? []) {
     if (!isPlainUserMessage(message)) continue
-    const text = messageText(message).toLowerCase()
+    const text = matchable(messageText(message).toLowerCase())
     if (text.length === 0) continue
     for (const keyword of keywords ?? []) {
       if (typeof keyword !== 'string' || keyword === '') continue
-      const needle = keyword.toLowerCase()
+      const needle = matchable(keyword.toLowerCase())
       if (!isAsciiWord(needle)) {
         if (text.includes(needle)) return { keyword }
         continue
       }
-      const bounded = new RegExp(`(?<![A-Za-z0-9_-])${literal(needle)}(?![A-Za-z0-9_-])`)
+      const bounded = new RegExp(
+        `(?<![${WORD_CHAR}])${keywordBody(needle)}${ASCII_INFLECTION}?(?![${WORD_CHAR}])`,
+        'u',
+      )
       if (bounded.test(text)) return { keyword }
     }
   }

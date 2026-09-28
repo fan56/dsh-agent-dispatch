@@ -72,6 +72,42 @@ test('autoKeywords default to the shipped bilingual dictionary, non-empty by con
   assert.ok(config.autoKeywords.includes('修复'))
   assert.ok(config.autoKeywords.includes('fix'))
   assert.ok(config.autoKeywords.includes('help me'))
+  // the two entries the first round found to be too narrow / too broad
+  assert.ok(config.autoKeywords.includes('修改'))
+  assert.ok(config.autoKeywords.includes('build'))
+  assert.ok(!config.autoKeywords.includes('can you'))
+  assert.ok(!config.autoKeywords.includes('为什么'))
+})
+
+/**
+ * The backticked list under the README's non-ASCII dictionary bullet, through
+ * the ASCII bullet that follows it. Parsing stops at the first line that is
+ * neither a bullet nor an indented continuation, so the prose after the list
+ * (which quotes single characters) is not collected.
+ * @param text - a README's full text.
+ */
+function dictionaryFromReadme(text) {
+  const lines = text.split('\n')
+  const start = lines.findIndex((line) => /^- .*(非 ASCII|non-ASCII)/.test(line))
+  assert.notEqual(start, -1, 'the README must document the default dictionary')
+  const out = []
+  for (let i = start; i < lines.length; i += 1) {
+    const line = lines[i]
+    if (i > start && !(line.startsWith('- ') || /^\s+`/.test(line))) break
+    for (const [, token] of line.matchAll(/`([^`]+)`/g)) out.push(token)
+  }
+  return out
+}
+
+test('both READMEs list the shipped dictionary word for word, in order', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const { DEFAULT_AUTO_KEYWORDS } = await import('../lib/index.js')
+  const shipped = [...DEFAULT_AUTO_KEYWORDS]
+  assert.ok(shipped.length > 60, 'the dictionary is a list, not a token set')
+  for (const file of ['README.md', 'README.en.md']) {
+    const text = await readFile(new URL(`../${file}`, import.meta.url), 'utf8')
+    assert.deepEqual(dictionaryFromReadme(text), shipped, file)
+  }
 })
 
 test('auto mode refuses an empty keyword gate — a mode that could never fire', () => {
