@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- chore: raise dsh host floor to 0.2.0-rc.2 — the umbrella peer
+  `@deepseek-ai/dsh` floor moves `>=0.1.7-rc.1` → `>=0.2.0-rc.2`. No code
+  changes: the `agent/pre-step` waterfall surface is unchanged in 0.2.0
+  (157/157 tests + `tsc --noEmit` green against the 0.2.0-rc.2 closure;
+  closure relinked to the installed host tree).
+
 - feat: `mode: 'auto'` — the local keyword gate. Every ordinary user turn is
   matched against the new `autoKeywords` list first, IN PROCESS (plain string
   matching, no network, no clock, no state), and only a hit earns one jev
