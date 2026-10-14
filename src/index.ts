@@ -249,6 +249,14 @@ export function apply(ctx: Context, input: unknown = {}, deps: DispatchDeps = {}
           questions,
           state,
           timeoutMs: config.timeoutMs,
+          // One timeout-only retry inside the same deadline (issue
+          // dsh-jev-core#1): a long-lived host process rides the global
+          // connection pool, and the first call after an idle gap can draw a
+          // connection the intermediary silently dropped — it burns its
+          // attempt, the abort frees the socket, and the retry lands on a
+          // fresh one. The total the turn can wait is unchanged; only the
+          // split between the two attempts moved.
+          retries: 1,
           ...(config.model !== null ? { model: config.model } : {}),
           ...(payload.signal !== undefined ? { signal: payload.signal } : {}),
           ...(deps.fetch !== undefined ? { fetchImpl: deps.fetch } : {}),

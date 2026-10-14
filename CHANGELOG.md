@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- fix: pass `retries: 1` to the core classify — the first call after an idle
+  gap in a long-lived host process can draw a pooled dead connection and
+  timeout; the retry (same total deadline, fresh connection) lands. The turn
+  never waits longer than `timeoutMs` in total (issue dsh-jev-core#1).
+
 - chore: raise dsh host floor to 0.2.0-rc.2 — the umbrella peer
   `@deepseek-ai/dsh` floor moves `>=0.1.7-rc.1` → `>=0.2.0-rc.2`. No code
   changes: the `agent/pre-step` waterfall surface is unchanged in 0.2.0

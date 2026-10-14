@@ -164,7 +164,7 @@ jq -r 'select(.action=="advise") | [.route, .confidence] | @tsv' verdicts.ndjson
 | `provider` | `'spawn'` | gate 探的 subagent provider |
 | `triggers` | `['/dispatch', '/jev']` | 触发词表，任何 mode 下都优先于关键词闸门 |
 | `autoKeywords` | 中英双语任务动词词典（见用法节） | `auto` 的本地闸门词典；中文走子串、ASCII 走词边界（允许 `s`/`es`/`ed`/`ing`/`ment`/`ments`/`d` 一个后缀，`fix` 覆盖 `fixing`、`remove` 覆盖 `removed`，但不命中 `prefix`），连字符算词分隔符，多词词条内部的词间分隔符是「任意一段非字母/数字/下划线字符」（所以 `help,me`/`help-me` 命中，而 `help_me`/`helpXme` 不命中），匹配前做 NFKC + 空白折叠（只作用于匹配副本），不分大小写；只在 `auto` 下被咨询 |
-| `timeoutMs` | `5000` | **单次 jev 调用**的死线（ms）。命中回合除了这次调用，还要叠加 roster 现读、脱敏组装、渲染注入这些开销——所以它不是"一个回合最坏会多等的毫秒数"，只是其中最大的一块；超时 fail-open 放行，turn 照常走，只是没有建议 |
+| `timeoutMs` | `5000` | **单次 jev 判定**的总死线（ms）。命中回合除了这次调用，还要叠加 roster 现读、脱敏组装、渲染注入这些开销——所以它不是"一个回合最坏会多等的毫秒数"，只是其中最大的一块；超时 fail-open 放行，turn 照常走，只是没有建议。总预算内最多两个尝试（首次超时后换新连接重试一次，治长驻进程的池化死连接，见 dsh-jev-core#1）——无论怎么切分都不会超过这个数 |
 | `stateChars` | `1200` | state 上限 |
 | `model` | `null` | jev 模型 id，`null` 用 core 的钉版 |
 | `thresholds` | 见上表 | 六个闸各自可配 |

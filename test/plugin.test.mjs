@@ -335,6 +335,36 @@ test('fail-open: a jev failure passes the turn through and stays quiet', async (
   }
 })
 
+test('a timed-out first attempt retries once on a fresh connection and lands (dsh-jev-core#1)', async () => {
+  const jev = fakeJev({ dispatch: 0.9 })
+  let calls = 0
+  const flaky = (url, init) => {
+    calls++
+    if (calls === 1) {
+      // The pooled-dead-connection shape: no response until the attempt's own
+      // deadline aborts it, exactly like a socket the intermediary dropped.
+      return new Promise((_, reject) => {
+        init.signal.addEventListener('abort', () => reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError')))
+      })
+    }
+    return jev.fetchImpl(url, init)
+  }
+  const log = tempDir('dsh-agent-dispatch-plugin-')
+  const { ctx, cleanup } = mount({ config: { logDir: log.dir, timeoutMs: 200 }, deps: { fetch: flaky } })
+  try {
+    const decision = ENTER([userMessage('/dispatch fix it')])
+    const out = await ctx.step({ agent: fakeAgent(), decision })
+    assert.notEqual(out, decision)
+    assert.equal(calls, 2, 'exactly one retry after the timeout')
+    assert.equal(ctx.deps.messageBuilder.injected.length, 1)
+    const [row] = await readVerdicts(log.file('verdicts.ndjson'))
+    assert.equal(row.action, 'advise')
+  } finally {
+    cleanup()
+    log.cleanup()
+  }
+})
+
 test('fail-open: a strictly-invalid response is a typed error, also fail-open', async () => {
   const log = tempDir('dsh-agent-dispatch-plugin-')
   const { ctx, cleanup } = mount({
