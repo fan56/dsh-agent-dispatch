@@ -343,8 +343,15 @@ test('a timed-out first attempt retries once on a fresh connection and lands (ds
     if (calls === 1) {
       // The pooled-dead-connection shape: no response until the attempt's own
       // deadline aborts it, exactly like a socket the intermediary dropped.
+      // The ref'd timer holds the event loop while it hangs — AbortSignal.timeout
+      // is unref'd, and a bare test process has no other ref'd work to keep
+      // the loop alive until the abort fires.
       return new Promise((_, reject) => {
-        init.signal.addEventListener('abort', () => reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError')))
+        const keepAlive = setTimeout(() => {}, 10_000)
+        init.signal.addEventListener('abort', () => {
+          clearTimeout(keepAlive)
+          reject(new DOMException('The operation was aborted due to timeout', 'TimeoutError'))
+        })
       })
     }
     return jev.fetchImpl(url, init)
