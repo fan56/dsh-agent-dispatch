@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- 0.2.1-rc.2 wave: CI closure tower restored to newest-of(latest,next) with a prerelease-aware compare (the 10-17 pin-to-latest hunk is undone); zero code changes — peer floor `>=0.2.0-rc.2` unchanged (pre-flight `includePrerelease` already matches 0.2.1-rc.2); verified against a 0.2.1-rc.2 host closure: typecheck clean, 158/0 tests, boot smoke pass.
+
 ## 0.2.1 - 2026-10-14
 
 - fix: pass `retries: 1` to the core classify — the first call after an idle
