@@ -1,6 +1,6 @@
 {
   "name": "@aiwayds/dsh-agent-dispatch",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "description": "dsh plugin: Jev-guided dispatch advice — before a turn starts, a TypeSafe Jev call decides whether the task belongs to a registered agent and which one, then injects a four-line, ignore-if-unsuited recommendation. Jev-optional: no key means silence.",
   "keywords": [
     "dsh",
@@ -61,5 +61,10 @@
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
   }
 }
