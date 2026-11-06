@@ -7,7 +7,7 @@ All notable changes to this project are documented in this file.
 ### Fixed
 - Every `@deepseek-ai` peer is now optional (`peerDependenciesMeta.optional: true`) — npm-class profile installs auto-resolve hard peers from the stable tower, and those exact-pinned copies shadow the host closure so the host pre-flight gate disables the plugin rows (the 10-26 cron 0.6.0 failure class, first seen 10-19). Surfaced by the new peer-meta audit in fan56/dsh-subagent-registry's weekly `e2e install`. No code change.
 
-## Unreleased
+## 0.3.0 (2026-11-06)
 
 - 0.2.2-rc.1 wave: zero code changes — the plugin declares no `@deepseek-ai/*` dev pins, CI's host closure install already resolves newest-of(latest,next) with a prerelease-aware compare (it adopts 0.2.2-rc.1 on its next run), and the peer floor `>=0.2.0-rc.2` is unchanged (pre-flight `includePrerelease` already matches 0.2.2-rc.1). Verified against a real 0.2.2-rc.1 host closure (scratch `dsh@0.2.2-rc.1` install, cordis 4.1.0 / schemastery 3.19.0): typecheck clean, 158/0 tests, boot smoke pass (mount + config-layer merge + clean boot + removal reconciles the stock tree).
 - 0.2.1-rc.2 wave: CI closure tower restored to newest-of(latest,next) with a prerelease-aware compare (the 10-17 pin-to-latest hunk is undone); zero code changes — peer floor `>=0.2.0-rc.2` unchanged (pre-flight `includePrerelease` already matches 0.2.1-rc.2); verified against a 0.2.1-rc.2 host closure: typecheck clean, 158/0 tests, boot smoke pass.
