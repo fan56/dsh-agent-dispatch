@@ -24,7 +24,7 @@
     "@deepseek-ai/dsh": ">=0.2.0-rc.2"
   },
   "dependencies": {
-    "@aiwayds/dsh-jev-core": "^0.1.0"
+    "@aiwayds/dsh-jev-core": "^0.2.0"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.1.0",
