@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+- 0.2.2-rc.2 wave: ride the host closure — the type-only dev pin `@deepseek-ai/dsh-agent` moves `0.2.2-rc.1` → `0.2.2-rc.2` (lockfile re-resolved from the official registry; the old lock's auto-installed peer tower is dropped via the new `.npmrc` `legacy-peer-deps=true`, same as dsh-feishu / dsh-cron). CI/release host-closure installs already resolve newest-of(latest,next) live with a prerelease-aware compare — no workflow change. Peer floor `>=0.2.0-rc.2` unchanged (pre-flight `includePrerelease` already matches 0.2.2-rc.2). Verified against a real 0.2.2-rc.2 host closure (scratch `dsh@0.2.2-rc.2` install, DSH_CLOSURE_DIR relink): typecheck clean, 158/0 tests, boot smoke pass (mount + config-layer merge + clean boot + removal reconciles the stock tree).
+
 ## 0.2.2 (2026-10-26)
 
 ### Fixed
