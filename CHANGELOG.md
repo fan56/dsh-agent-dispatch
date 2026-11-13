@@ -4,6 +4,7 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+- Added: npm packaged upgrade regression test (pnpm 11 strictDepBuilds, see dsh-subagent-registry#10).
 - 0.2.2-rc.2 wave: the runtime dependency `@aiwayds/dsh-jev-core` moves `^0.1.0` -> `^0.2.0` (lockfile re-resolved from the official registry). Unlike the dev-only closure rides below, this one ships in the published tarball — it is the sole published-artifact increment assigned to the planned `0.3.1` release by the 0.2.2-rc.2 audit (`dsh-0.2.2-rc.2-impact-audit.md` rows 1.3-zero and 3). No code change: the consumed jev-core surface is unchanged between 0.1.x and 0.2.0.
 - 0.2.2-rc.2 wave: ride the host closure — the type-only dev pin `@deepseek-ai/dsh-agent` moves `0.2.2-rc.1` → `0.2.2-rc.2` (lockfile re-resolved from the official registry; the old lock's auto-installed peer tower is dropped via the new `.npmrc` `legacy-peer-deps=true`, same as dsh-feishu / dsh-cron). CI/release host-closure installs already resolve newest-of(latest,next) live with a prerelease-aware compare — no workflow change. Peer floor `>=0.2.0-rc.2` unchanged (pre-flight `includePrerelease` already matches 0.2.2-rc.2). Verified against a real 0.2.2-rc.2 host closure (scratch `dsh@0.2.2-rc.2` install, DSH_CLOSURE_DIR relink): typecheck clean, 158/0 tests, boot smoke pass (mount + config-layer merge + clean boot + removal reconciles the stock tree).
 

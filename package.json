@@ -51,7 +51,7 @@
     "check": "tsc --noEmit -p tsconfig.json",
     "precheck": "node scripts/link-dsh-closure.mjs",
     "pretest": "npm run build",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test test/*.test.mjs && node test/packaged-upgrade.test.mjs",
     "smoke": "node scripts/smoke-boot.mjs"
   },
   "author": "fan56",
